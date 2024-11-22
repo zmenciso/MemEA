@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{OpenOptions, File};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::collections::HashMap;
@@ -18,21 +18,28 @@ pub fn area(report: &HashMap<String, f32>) -> f32 {
     report.values().sum()
 }
 
-pub fn export(input: &PathBuf, report: &HashMap<String, f32>, filename: Option<PathBuf>) {
+pub fn export(input: &str, report: &HashMap<String, f32>, filename: &Option<PathBuf>) {
     let buf = match filename {
-        Some(x) => Some(File::create(x).expect("Could not create file")),
+        Some(x) => {
+            let f = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(x)
+                .expect("Could not open file");
+
+            Some(f)
+        },
         None => None
     };
 
-    let mut content = format!("periph_gen\n\
-        Configuration: {:?}\n\n\
+    let mut content = format!("\n\nConfiguration: {}\n\
         Area breakdown:\n", input);
 
     for (name, area) in report.into_iter() {
         content = format!("{}    {:<24} | {:>10.3} μm²\n", content, name, area);
     }
 
-    content = format!("{}\nTotal area: {:.3} μm²", content, area(report));
+    content = format!("{}Total area: {:.3} μm²", content, area(report));
 
     writeout(content, buf);
 }
