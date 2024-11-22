@@ -1,9 +1,11 @@
 use std::error::Error;
+use std::path::PathBuf;
 use std::io::{BufRead, BufReader};
 use std::fs;
 
 #[derive(Debug)]
 pub struct Config {
+    pub path: String,
     pub n: i32,
     pub m: i32,
     pub bl: Vec<f32>,
@@ -16,8 +18,9 @@ pub struct Config {
 }
 
 impl Config {
-    fn new() -> Config {
+    fn new(name: &PathBuf) -> Config {
         Config {
+            path: name.to_string_lossy().into_owned(),
             n: 64,
             m: 64,
             bl: Vec::new(),
@@ -53,7 +56,7 @@ impl Config {
 }
 
 pub fn read(filename: &std::path::PathBuf) -> Result<Config, Box<dyn Error>> {
-    let mut config = Config::new();
+    let mut config = Config::new(filename);
 
     let file = fs::File::open(filename)?;
     let rdr = BufReader::new(file);
