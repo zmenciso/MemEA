@@ -32,14 +32,14 @@ pub fn export(input: &str, report: &HashMap<String, f32>, filename: &Option<Path
         None => None
     };
 
-    let mut content = format!("\n\nConfiguration: {}\n\
+    let mut content = format!("Configuration: {}\n\
         Area breakdown:\n", input);
 
     for (name, area) in report.into_iter() {
         content = format!("{}    {:<24} | {:>10.3} μm²\n", content, name, area);
     }
 
-    content = format!("{}Total area: {:.3} μm²", content, area(report));
+    content = format!("{}Total area: {:.3} μm²\n\n", content, area(report));
 
     writeout(content, buf);
 }

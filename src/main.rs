@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     export::vprint("Building database...", verbose);
     let db = primitives::build_db(&args.db)?;
 
-    export::vprint("Tabulating solution...", verbose);
+    export::vprint("Tabulating solution...\n", verbose);
     let reports: Vec<HashMap<String, f32>> = config.
         iter().
         map(|x| tabulate::tabulate(x, &db)).
@@ -62,6 +62,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             false => export::export(&config[i].path, &reports[i], &args.export)
         };
     }
+
+    export::vprint("Cleaning up...", verbose);
 
     Ok(())
 }
