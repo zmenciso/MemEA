@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::error::Error;
 
 use crate::config::Config;
 use crate::primitives::{Cell, DB};
@@ -80,7 +78,7 @@ fn locate_logic(dx: f32, bits: i32, logic: &HashMap<String, Cell>) -> (String, O
     (target, driver)
 }
 
-pub fn tabulate(config: Config, db: &DB) -> Result<HashMap<String, f32>, Box<dyn Error>> {
+pub fn tabulate(config: &Config, db: &DB) -> HashMap<String, f32> {
     let mut results: HashMap<String, f32> = HashMap::new();
 
     // Get cell and compute area
@@ -104,8 +102,8 @@ pub fn tabulate(config: Config, db: &DB) -> Result<HashMap<String, f32>, Box<dyn
     let bits_bl = (config.bl.len() as f32).log2().ceil() as i32;
 
     // Get WL drivers and compute area
-    for voltage in config.wl.into_iter() {
-        let (target, driver) = locate_driver(voltage, dx_wl, &db.switches);
+    for voltage in &config.wl {
+        let (target, driver) = locate_driver(*voltage, dx_wl, &db.switches);
         results.insert(format!("WL   {}", target), driver.unwrap().area(config.n, 1));
     }
 
@@ -114,8 +112,8 @@ pub fn tabulate(config: Config, db: &DB) -> Result<HashMap<String, f32>, Box<dyn
     results.insert(format!("WL   {}", target), driver.unwrap().area(config.n, 1));
 
     // Get BL drivers and compute area
-    for voltage in config.bl.into_iter() {
-        let (target, driver) = locate_driver(voltage, dx_bl, &db.switches);
+    for voltage in &config.bl {
+        let (target, driver) = locate_driver(*voltage, dx_bl, &db.switches);
         results.insert(format!("BL   {}", target), driver.unwrap().area(1, config.m));
     }
     
@@ -124,8 +122,8 @@ pub fn tabulate(config: Config, db: &DB) -> Result<HashMap<String, f32>, Box<dyn
     results.insert(format!("BL   {}", target), driver.unwrap().area(1, config.m));
 
     // Get well drivers and compute area
-    for voltage in config.well.into_iter() {
-        let (target, driver) = locate_driver(voltage, dx_well, &db.switches);
+    for voltage in &config.well {
+        let (target, driver) = locate_driver(*voltage, dx_well, &db.switches);
         results.insert(format!("WELL {}", target), driver.unwrap().area(1, config.m));
     }
 
@@ -137,8 +135,8 @@ pub fn tabulate(config: Config, db: &DB) -> Result<HashMap<String, f32>, Box<dyn
         results.insert(format!("ADC  {}", target), adc.unwrap().area(1, config.adcs));
     }
     else if mm_n && mm_na {
-        println!("WARNING: ADC configuration error; ADCs will not be generated");
+        eprintln!("WARNING: ADC configuration error; ADCs will not be generated");
     }
 
-    Ok(results)
+    results
 }
