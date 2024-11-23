@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for i in 0..reports.len() {
         match args.area_only {
-            true => println!("{} {}", config[i].path, export::area(&reports[i])),
+            true => println!("{}\t{}", config[i].path, export::area(&reports[i])),
             false => export::export(&config[i].path, &reports[i], &args.export)
         };
     }

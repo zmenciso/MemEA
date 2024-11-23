@@ -36,10 +36,10 @@ pub fn export(input: &str, report: &HashMap<String, f32>, filename: &Option<Path
         Area breakdown:\n", input);
 
     for (name, area) in report.into_iter() {
-        content = format!("{}    {:<24} | {:>10.3} μm²\n", content, name, area);
+        content = format!("{}    {:<24} | {:>10.1} μm²\n", content, name, area);
     }
 
-    content = format!("{}Total area: {:.3} μm²\n\n", content, area(report));
+    content = format!("{}Total area: {:.1} μm²\n\n", content, area(report));
 
     writeout(content, buf);
 }
