@@ -10,6 +10,11 @@ fn locate_driver(voltage: f32, dx: f32, switches: &HashMap<String, Cell>) -> (St
     let mut target = String::from("");
     let mut driver: Option<&Cell> = None;
 
+    // Skip high-impedance
+    if voltage < 0.0 {
+        return (target, driver);
+    }
+
     for (name, cell) in switches.into_iter() {
         // If we don't have a target, we take the first valid switch
         if (target.len() == 0) && (cell.dx >= dx) && (cell.voltage >= voltage) {
@@ -104,7 +109,9 @@ pub fn tabulate(config: &Config, db: &DB) -> HashMap<String, f32> {
     // Get WL drivers and compute area
     for voltage in &config.wl {
         let (target, driver) = locate_driver(*voltage, dx_wl, &db.switches);
-        results.insert(format!("WL   {}", target), driver.unwrap().area(config.n, 1));
+        if driver.is_some() {
+            results.insert(format!("WL   {}", target), driver.unwrap().area(config.n, 1));
+        }
     }
 
     // Get WL logic area
@@ -114,7 +121,9 @@ pub fn tabulate(config: &Config, db: &DB) -> HashMap<String, f32> {
     // Get BL drivers and compute area
     for voltage in &config.bl {
         let (target, driver) = locate_driver(*voltage, dx_bl, &db.switches);
-        results.insert(format!("BL   {}", target), driver.unwrap().area(1, config.m));
+        if driver.is_some() {
+            results.insert(format!("BL   {}", target), driver.unwrap().area(1, config.m));
+        }
     }
     
     // Get BL logic area
@@ -124,7 +133,9 @@ pub fn tabulate(config: &Config, db: &DB) -> HashMap<String, f32> {
     // Get well drivers and compute area
     for voltage in &config.well {
         let (target, driver) = locate_driver(*voltage, dx_well, &db.switches);
-        results.insert(format!("WELL {}", target), driver.unwrap().area(1, config.m));
+        if driver.is_some() {
+            results.insert(format!("WELL {}", target), driver.unwrap().area(1, config.m));
+        }
     }
 
     // Get ADC area
