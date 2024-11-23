@@ -47,6 +47,13 @@ and `cell` (the memory cell).  Additional options are listed below:
 | `fs` | `float` | ADC sampling rate | `1e9` |
 | `adcs` | `int` | Number of ADCs per array | `64` |
 
+If more lines are needed (e.g. bitline **and** senseline), then repeat voltages
+in the appropriate line.  For example:
+
+```
+wl: 4, 4, 2.5, 0, 0
+```
+
 An example configuration is also available: `./config/example.txt`.
 
 ## Database
@@ -111,6 +118,9 @@ logic.
 | `dx` | `float` | Relative drive strength of the switch | `16` |
 
 ### `adc`
+
+For ADCs, include any switches that might be needed to isolate the circuit from
+high voltage.
 
 | Option | Type | Description | Example |
 |--------|------|-------------|---------|
