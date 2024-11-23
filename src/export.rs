@@ -7,6 +7,10 @@ pub fn vprint(message: &str, verbose: bool) {
     if verbose { println!("{}", message); }
 }
 
+pub fn error(message: String) {
+    eprintln!("\x1b[0;31;40mERROR: {}\x1b[0m", message);
+}
+
 fn writeout(content: String, buf: Option<File>) {
     match buf {
         Some(mut file) => file.write_all(content.as_bytes()),

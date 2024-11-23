@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::fmt::format;
 
 use crate::config::Config;
 use crate::primitives::{Cell, DB};
+use crate::export::error;
 
 const WELL_SCALE: f32 = 0.25;
 const LOGIC_SCALE: f32 = 0.5;
@@ -28,7 +30,7 @@ fn locate_driver(voltage: f32, dx: f32, switches: &HashMap<String, Cell>) -> (St
     }
 
     if driver.is_none() {
-        eprintln!("ERROR: Failed to find suitable switch for voltage {} and drive strength {}", voltage, dx);
+        error(format!("Failed to find suitable switch for voltage {} and drive strength {}", voltage, dx));
         std::process::exit(4);
     }
 
@@ -52,7 +54,7 @@ fn locate_adc(fs: f32, bits: i32, adcs: &HashMap<String, Cell>) -> (String, Opti
     }
 
     if adc.is_none() {
-        eprintln!("ERROR: Failed to find suitable {}-bit adc with fs={}", bits, fs);
+        error(format!("Failed to find suitable {}-bit adc with fs={}", bits, fs));
         std::process::exit(4);
     }
 
@@ -76,7 +78,7 @@ fn locate_logic(dx: f32, bits: i32, logic: &HashMap<String, Cell>) -> (String, O
     }
 
     if driver.is_none() {
-        eprintln!("ERROR: Failed to find suitable switch for driver logic with {} bits and drive strength {}", bits, dx);
+        error(format!("Failed to find suitable switch for driver logic with {} bits and drive strength {}", bits, dx));
         std::process::exit(4);
     }
 
@@ -93,7 +95,7 @@ pub fn tabulate(config: &Config, db: &DB) -> HashMap<String, f32> {
             x
         }
         None => {
-            eprintln!("ERROR: cell {} not found", config.cell);
+            error(format!("cell {} not found", config.cell));
             std::process::exit(3);
         }
     };

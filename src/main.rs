@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         match result {
             Ok(t) => config.push(t),
             Err(e) => {
-                eprintln!("ERROR: Could not parse input {}", e);
+                export::error(format!("Could not parse input {}", e));
                 std::process::exit(5); 
             }
         }
