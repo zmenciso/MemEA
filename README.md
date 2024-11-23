@@ -103,8 +103,7 @@ inverters).
 |--------|------|-------------|---------|
 | `fs` | `float` | Maximum operating speed of the logic | `1e9` |
 | `dx` | `float` | Relative drive strength output of the logic | `6` |
-| `bits` | `int` | Number of control bits (i.e. a 2-bit logic circuit can drive
-up to 4 switches) | `2` |
+| `bits` | `int` | Number of control bits (i.e. a 2-bit logic circuit can drive up to 4 switches) | `2` |
 
 ### `switch`
 
