@@ -1,5 +1,6 @@
 [package]
-name = "periph_gen"
+name = "MemEA"
+authors = ["Zephan Enciso <zmenciso@pm.me>"]
 version = "0.1.0"
 edition = "2021"
 

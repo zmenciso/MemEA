@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::fmt::format;
 
 use crate::config::Config;
 use crate::primitives::{Cell, DB};
 use crate::export::error;
 
+// Drive strength multipliers
 const WELL_SCALE: f32 = 0.25;
 const LOGIC_SCALE: f32 = 0.5;
 

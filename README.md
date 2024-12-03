@@ -1,6 +1,6 @@
-# Periph_gen
+# MemEA
 
-Periph_gen is a simple tool for estimating the area breakdown of memory arrays.
+MemEA is a simple tool for estimating the area breakdown of memory arrays.
 It supports multiple array types (e.g. CAM, SRAM, compute-in-memory) and
 emerging devices (e.g. FeFET).
 
@@ -12,16 +12,16 @@ Install the latest version of `rustup`, then run:
 cargo build --release
 ```
 
-The output executable will be `target/release/periph_gen`.
+The output executable will be `target/release/MemEA`.
 
 # Usage
 
-Periph_gen requires two inputs: **1)** a configuration file that describes the
+MemEA requires two inputs: **1)** a configuration file that describes the
 memory array and **2)** a database of cells and peripheral circuits.  Both are
 written in simple plain text files as key/value pairs.  A single colon `:`
 separates the key from the value, and lines starting with `#` are ignored.
 
-Periph_gen also accepts multiple configuration files, which will be compared
+MemEA also accepts multiple configuration files, which will be compared
 against each other after running.
 
 Command line options:

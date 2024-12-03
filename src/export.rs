@@ -3,11 +3,9 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::collections::HashMap;
 
-pub fn vprint(message: &str, verbose: bool) {
-    if verbose { println!("{}", message); }
-}
-
-pub fn error(message: String) {
+pub fn error<T>(message: T) 
+    where T: std::fmt::Display
+{
     eprintln!("\x1b[0;31;40mERROR: {}\x1b[0m", message);
 }
 

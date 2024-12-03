@@ -69,16 +69,15 @@ impl Cell {
         }
     }
 
-    // TODO: Implement error handling
     pub fn update(&mut self, key: &str, value: &str) {
         match key.to_lowercase().as_str() {
-            "spc_x"     => { self.dims.spc_x = value.parse::<f32>().unwrap() },
-            "spc_y"     => { self.dims.spc_y = value.parse::<f32>().unwrap() },
-            "enc"       => { self.dims.enc= value.parse::<f32>().unwrap() },
-            "voltage"   => { self.voltage = value.parse::<f32>().unwrap() },
-            "dx"        => { self.dx = value.parse::<f32>().unwrap() },
-            "bits"      => { self.bits = value.parse::<i32>().unwrap() },
-            "fs"        => { self.fs = value.parse::<f32>().unwrap() },
+            "spc_x"     => { self.dims.spc_x = value.parse::<f32>().expect("Could not parse spc_x") },
+            "spc_y"     => { self.dims.spc_y = value.parse::<f32>().expect("Could not parse spc_y") },
+            "enc"       => { self.dims.enc= value.parse::<f32>().expect("Could not parse enc") },
+            "voltage"   => { self.voltage = value.parse::<f32>().expect("Could not parse voltage") },
+            "dx"        => { self.dx = value.parse::<f32>().expect("Could not parse dx") },
+            "bits"      => { self.bits = value.parse::<i32>().expect("Could not parse bits") },
+            "fs"        => { self.fs = value.parse::<f32>().expect("Could not parse fs") },
             _           => { }
         }
     }
@@ -88,12 +87,12 @@ impl Cell {
             ((n as f32 * self.dims.spc_y) + self.dims.enc)
     }
 
-    pub fn rotate(&mut self) {
-        let temp = self.dims.spc_x;
+    // pub fn rotate(&mut self) {
+    //     let temp = self.dims.spc_x;
 
-        self.dims.spc_x = self.dims.spc_y;
-        self.dims.spc_y = temp;
-    }
+    //     self.dims.spc_x = self.dims.spc_y;
+    //     self.dims.spc_y = temp;
+    // }
 }
 
 pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, Box<dyn Error>>{
@@ -107,13 +106,15 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, Box<dyn Error>>{
     let mut temp = Cell::new();
 
     for line in rdr.lines() {
-        let line = line.unwrap();
+        let line = line.expect("Could not decode line");
         let line = line.trim();
 
         if line.starts_with('#') || (line.len() == 0) { continue; }
 
         if !line.contains(':') {
+            // Insert previous target
             db.insert(&kind, &target, temp);
+            // New target
             target = line.to_string();
             continue;
         }
@@ -123,6 +124,7 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, Box<dyn Error>>{
                 kind = value.trim().to_string(); 
                 continue;
             }
+            // Add paramter to cell
             temp.update(param.trim(), value.trim());
         } else {
             eprintln!("Delimeter not found in string.");

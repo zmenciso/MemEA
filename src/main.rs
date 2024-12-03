@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let verbose = !args.quiet && !args.area_only;
 
-    export::vprint("Reading configuration files...", verbose);
+    if verbose { println!("Reading configuration files..."); }
     let mut config: Vec<config::Config> = Vec::new();
     for path in args.config {
         let result = config::read(&path);
@@ -45,10 +45,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    export::vprint("Building database...", verbose);
+    if verbose { println!("Building database..."); }
     let db = primitives::build_db(&args.db)?;
 
-    export::vprint("Tabulating solution...\n", verbose);
+    if verbose { println!("Computing solution...\n"); }
     let reports: Vec<HashMap<String, f32>> = config.
         iter().
         map(|x| tabulate::tabulate(x, &db)).
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
     }
 
-    export::vprint("Cleaning up...", verbose);
+    if verbose { println!("Cleaning up..."); }
 
     Ok(())
 }
