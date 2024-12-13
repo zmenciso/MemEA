@@ -12,14 +12,14 @@ Install the latest version of `rustup`, then run:
 cargo build --release
 ```
 
-The output executable will be `target/release/MemEA`.
+The output executable will be `target/release/mem_ea`.
 
 # Usage
 
-MemEA requires two inputs: **1)** a configuration file that describes the
-memory array and **2)** a database of cells and peripheral circuits.  Both are
-written in simple plain text files as key/value pairs.  A single colon `:`
-separates the key from the value, and lines starting with `#` are ignored.
+MemEA requires two inputs: **1)** a configuration file that describes the memory
+array and **2)** a database of cells and peripheral circuits.  Both are written
+in simple plain text files as key/value pairs.  Empty lines and lines  starting
+with `#` are ignored.
 
 MemEA also accepts multiple configuration files, which will be compared
 against each other after running.
@@ -32,8 +32,11 @@ Command line options:
 
 ## Memory Configuration
 
-The required options are `n` (the number of rows), `m` (the number of columns),
-and `cell` (the memory cell).  Additional options are listed below:
+Options are separated from their values by `:`.  The required options are `n`
+(the number of rows), `m` (the number of columns), and `cell` (the memory cell
+to use).
+
+A full list of options is provided below:
 
 | Option | Type | Description | Example |
 |--------|------|-------------|---------|
@@ -47,30 +50,30 @@ and `cell` (the memory cell).  Additional options are listed below:
 | `fs` | `float` | ADC sampling rate | `1e9` |
 | `adcs` | `int` | Number of ADCs per array | `64` |
 
-If more lines are needed (e.g. bitline **and** senseline), then repeat voltages
-in the appropriate line.  For example:
+"Bitline" and "wordline" represent abstract vertical and horizontal lines,
+respectively. If more lines are needed (e.g. bitline **and** senseline), then
+repeat voltages in the appropriate line.  For example:
 
 ```
-wl: 4, 4, 2.5, 0, 0
+bl: 4, 4, 2.5, 0, 0
 ```
 
 An example configuration is also available: `./config/example.txt`.
 
 ## Database
 
-The database has four types of circuits: `cell`, `logic`, `switch`, and `adc`.
-Describing a circuit begins with the name of the circuit, followed by the
-key/value pairs for the circuit properties.  The database file should end with
-`ENDDB`, and the `type` property is mandatory for each circuit. For example:
+The database has four types of circuits: `core`, `logic`, `switch`, and `adc`.
+Describing a circuit begins with the type and name of the circuit, separated by
+`:`. Subsequent lines describe the properties of the circuit, separated by
+whitespace.  For example:
 
 ```
-TXGD16
-	type: switch
-	voltage: 1.3
-	dx: 16
-	spc_x: 1.156
-	spc_y: 0.995
-	enc: 0.490
+switch: TXGD16
+	voltage 1.3
+	dx 16
+	spc_x 1.156
+	spc_y 0.995
+	enc 0.490
 ```
 
 An example database is also available: `./data/example.txt`.
@@ -87,11 +90,12 @@ All types of circuits require the following geometric properties:
 
 Then, each of the four types has additional properties:
 
-### `cell`
+### `core`
 
 | Option | Type | Description | Example |
 |--------|------|-------------|---------|
-| `dx` | `float` | Relative drive strength required per-cell | `0.25` |
+| `dx_bl` | `float` | Relative bitline drive strength required per-cell | `0.25` |
+| `dx_wl` | `float` | Relative wordline drive strength required per-cell | `0.25` |
 
 ### `logic`
 
@@ -125,3 +129,10 @@ high voltage.
 |--------|------|-------------|---------|
 | `bits` | `float` | ENOB of the ADC | `6.2` |
 | `fs` | `float` | Maximum sampling rate of the ADC | `2e9` |
+
+# Planned Features
+
+  - CSV file output 
+  - Support for driving negative voltages
+  - Support for individual wells per row/column (for write/verify in FeFET,
+    etc.)
