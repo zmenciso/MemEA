@@ -1,14 +1,12 @@
+
 use clap::Parser;
-use std::path::PathBuf;
 use std::error::Error;
-use std::collections::HashMap;
+use std::path::PathBuf;
+
+use mem_ea::*;
+use mem_ea::config::Config;
 
 const DEFAULT_DB: &str = "./data/db.txt";
-
-mod config;
-mod primitives;
-mod tabulate;
-mod export;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -32,38 +30,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let verbose = !args.quiet && !args.area_only;
 
-    if verbose { println!("Reading configuration files..."); }
-    let mut config: Vec<config::Config> = Vec::new();
-    for path in args.config {
-        let result = config::read(&path);
-        match result {
-            Ok(t) => config.push(t),
-            Err(e) => {
-                export::error(format!("Could not parse input {}", e));
-                std::process::exit(5); 
-            }
-        }
+    if args.config.len() == 0 {
+        eprintln!("No configuration files specified; aborting...");
+        std::process::exit(255);
     }
 
     if verbose { println!("Building database..."); }
     let db = primitives::build_db(&args.db)?;
 
-    if verbose { println!("Computing solution...\n"); }
-    let reports: Vec<HashMap<String, f32>> = config.
-        iter().
-        map(|x| tabulate::tabulate(x, &db)).
-        collect();
+    if verbose { println!("Reading configuration files..."); }
+    let configs: Vec<Config> = args.config.iter()
+        .map(|p| config::read(p).expect("Could not read configuration file"))
+        .collect();
 
-    assert!(reports.len() == config.len());
+    if verbose { println!("Building solution..."); }
+    let reports: Vec<Report> = configs.iter()
+        .map(|c| tabulate::tabulate(c, &db))
+        .collect();
 
-    for i in 0..reports.len() {
+    assert_eq!(configs.len(), reports.len());
+
+    for i in 0 .. reports.len() {
         match args.area_only {
-            true => println!("{}\t{}", config[i].path, export::area(&reports[i])),
-            false => export::export(&config[i].path, &reports[i], &args.export)
-        };
+            true => { println!("{}\t{}", &configs[i].path, export::area(&reports[i])); }
+            false => { export::export(&configs[i].path, &reports[i], &args.export); }
+        }
     }
-
-    if verbose { println!("Cleaning up..."); }
 
     Ok(())
 }

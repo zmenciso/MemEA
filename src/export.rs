@@ -1,47 +1,44 @@
 use std::fs::{OpenOptions, File};
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::collections::HashMap;
 
-pub fn error<T>(message: T) 
-    where T: std::fmt::Display
-{
-    eprintln!("\x1b[0;31;40mERROR: {}\x1b[0m", message);
-}
+use crate::{eliteral, Report};
 
-fn writeout(content: String, buf: Option<File>) {
+fn writeout(content: &str, buf: Option<File>) {
     match buf {
         Some(mut file) => file.write_all(content.as_bytes()),
         None => io::stdout().write_all(content.as_bytes()) 
-    }.expect("Could not write bytes to file");
+    }.expect(eliteral!("Could not write bytes to file"));
 }
 
-pub fn area(report: &HashMap<String, f32>) -> f32 {
-    report.values().sum()
+pub fn area(reports: &Report) -> f32 {
+    reports.iter()
+        .map(|&(_, value)| value)
+        .sum()
 }
 
-pub fn export(input: &str, report: &HashMap<String, f32>, filename: &Option<PathBuf>) {
+pub fn export(input: &str, report: &Report, filename: &Option<PathBuf>) {
     let buf = match filename {
         Some(x) => {
             let f = OpenOptions::new()
                 .append(true)
                 .create(true)
                 .open(x)
-                .expect("Could not open file");
+                .expect(eliteral!("Could not open file"));
 
             Some(f)
         },
         None => None
     };
 
-    let mut content = format!("Configuration: {}\n\
+    let mut content = format!("\nConfiguration: {}\n\
         Area breakdown:\n", input);
 
-    for (name, area) in report.into_iter() {
+    for (name, area) in report.iter() {
         content = format!("{}    {:<24} | {:>10.1} μm²\n", content, name, area);
     }
 
-    content = format!("{}Total area: {:.1} μm²\n\n", content, area(report));
+    content = format!("{}Total area: {:.1} μm²\n", content, area(report));
 
-    writeout(content, buf);
+    writeout(&content, buf);
 }

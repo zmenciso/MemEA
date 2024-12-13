@@ -1,154 +1,157 @@
-use std::collections::HashMap;
+use std::process;
 
+use crate::eliteral;
+use crate::{Report, Float};
 use crate::config::Config;
-use crate::primitives::{Cell, DB};
-use crate::export::error;
+use crate::primitives::*;
 
 // Drive strength multipliers
-const WELL_SCALE: f32 = 0.25;
-const LOGIC_SCALE: f32 = 0.5;
+const WELL_SCALE: Float = 0.25;
+const LOGIC_SCALE: Float = 0.5;
 
-fn locate_driver(voltage: f32, dx: f32, switches: &HashMap<String, Cell>) -> (String, Option<&Cell>) {
-    let mut target = String::from("");
-    let mut driver: Option<&Cell> = None;
+const ONE: Float = 1 as Float;
 
-    // Skip high-impedance
-    if voltage < 0.0 {
-        return (target, driver);
-    }
+fn locate(condition: impl Fn(&dyn Geometry) -> bool, cells: &CellList) -> (String, &dyn Geometry) {
+    let mut target = String::new();
+    let mut sel: Option<&dyn Geometry> = None;
 
-    for (name, cell) in switches.into_iter() {
-        // If we don't have a target, we take the first valid switch
-        if (target.len() == 0) && (cell.dx >= dx) && (cell.voltage >= voltage) {
-            target = format!("{}", name);
-            driver = Some(cell);
+    for (name, cell) in cells.iter() {
+        let cell: &dyn Geometry = match cell {
+            Cell::ADC(x) => x,
+            Cell::Logic(x) => x,
+            Cell::Switch(x) => x,
+            _ => continue,
+        };
+
+        if sel.is_none() && condition(cell) {
+            (target, sel) = (name.to_owned(), Some(cell));
         }
-        // Otherwise we check to see if this switch is better suited
-        else if (target.len() > 0) && ((cell.dx >= dx) && (cell.dx < driver.unwrap().dx)) && ((cell.voltage >= voltage) && (cell.voltage < driver.unwrap().voltage)) && (cell.area(1,1) <= driver.unwrap().area(1,1)) {
-            driver = Some(cell);
-        }
-    }
-
-    if driver.is_none() {
-        error(format!("Failed to find suitable switch for voltage {} and drive strength {}", voltage, dx));
-        std::process::exit(4);
-    }
-
-    (target, driver)
-}
-
-fn locate_adc(fs: f32, bits: i32, adcs: &HashMap<String, Cell>) -> (String, Option<&Cell>) {
-    let mut target = String::from("");
-    let mut adc: Option<&Cell> = None;
-
-    for (name, cell) in adcs.into_iter() {
-        // If we don't have a target, we take the first valid adc
-        if (target.len() == 0) && (cell.fs >= fs) && (cell.bits >= bits) {
-            target = format!("{}", name);
-            adc = Some(cell);
-        }
-        // Otherwise we check to see if this adc is better suited
-        else if (target.len() > 0) && ((cell.fs >= fs) && (cell.fs < adc.unwrap().fs)) && ((cell.bits >= bits) && (cell.bits < adc.unwrap().bits)) && (cell.area(1,1) <= adc.unwrap().area(1,1)) {
-            adc = Some(cell);
+        else if sel.is_some() && condition(cell) {
+            let sel_dims = sel.unwrap().dims();
+            if cell.dims().area(ONE, ONE) <= sel_dims.area(ONE, ONE) {
+                (target, sel) = (name.to_owned(), Some(cell));
+            }
         }
     }
 
-    if adc.is_none() {
-        error(format!("Failed to find suitable {}-bit adc with fs={}", bits, fs));
-        std::process::exit(4);
-    }
-
-    (target, adc)
-}
-
-fn locate_logic(dx: f32, bits: i32, logic: &HashMap<String, Cell>) -> (String, Option<&Cell>) {
-    let mut target = String::from("");
-    let mut driver: Option<&Cell> = None;
-
-    for (name, cell) in logic.into_iter() {
-        // If we don't have a target, we take the first valid logic
-        if (target.len() == 0) && (cell.bits >= bits) && (cell.dx >= dx) {
-            target = format!("{}", name);
-            driver = Some(cell);
-        }
-        // Otherwise we check to see if this logic is better suited
-        else if (target.len() > 0) && ((cell.dx >= dx) && (cell.dx < driver.unwrap().dx)) && ((cell.bits >= bits) && (cell.bits < driver.unwrap().bits)) && (cell.area(1,1) <= driver.unwrap().area(1,1)) {
-            driver = Some(cell);
-        }
-    }
-
-    if driver.is_none() {
-        error(format!("Failed to find suitable switch for driver logic with {} bits and drive strength {}", bits, dx));
-        std::process::exit(4);
-    }
-
-    (target, driver)
-}
-
-pub fn tabulate(config: &Config, db: &DB) -> HashMap<String, f32> {
-    let mut results: HashMap<String, f32> = HashMap::new();
-
-    // Get cell and compute area
-    let arr_cell = match db.cells.get(&config.cell) {
-        Some(x) => {
-            results.insert(format!("CELL {}",config.cell), x.area(config.n, config.m));
-            x
-        }
+    match sel {
+        Some(x) => (target, x),
         None => {
-            error(format!("cell {} not found", config.cell));
-            std::process::exit(3);
-        }
-    };
-
-    // Compute required dx
-    let dx_bl = config.n as f32 * arr_cell.dx;
-    let dx_wl = config.m as f32 * arr_cell.dx;
-    let dx_well = dx_wl * WELL_SCALE;
-
-    let bits_wl = (config.wl.len() as f32).log2().ceil() as i32;
-    let bits_bl = (config.bl.len() as f32).log2().ceil() as i32;
-
-    // Get WL drivers and compute area
-    for voltage in &config.wl {
-        let (target, driver) = locate_driver(*voltage, dx_wl, &db.switches);
-        if driver.is_some() {
-            results.insert(format!("WL   {}", target), driver.unwrap().area(config.n, 1));
+            eprintln!("Failed to find suitable cell");
+            process::exit(4);
         }
     }
+}
 
-    // Get WL logic area
-    let (target, driver) = locate_logic(dx_wl/2.0, bits_wl, &db.logic);
-    results.insert(format!("WL   {}", target), driver.unwrap().area(config.n, 1));
+fn locate_type<T: 'static>(condition: impl Fn(&T) -> bool, cells: &CellList) -> (String, &T) {
+    let (name, cell) = locate(
+        |cell: &dyn Geometry| {
+            if let Some(typed) = cell.as_any().downcast_ref::<T>() {
+                condition(typed)
+            } 
+            else {
+                false 
+            }
+        },
+        cells,
+    );
 
-    // Get BL drivers and compute area
-    for voltage in &config.bl {
-        let (target, driver) = locate_driver(*voltage, dx_bl, &db.switches);
-        if driver.is_some() {
-            results.insert(format!("BL   {}", target), driver.unwrap().area(1, config.m));
+    (name, cell.as_any().downcast_ref::<T>().unwrap())
+
+}
+
+fn locate_adc(fs: Float, bits: Float, adcs: &CellList) -> (String, &ADC) {
+    locate_type(|adc: &ADC| adc.fs >= fs && adc.bits >= bits, 
+        adcs)
+}
+
+fn locate_logic(dx: Float, bits: Float, logics: &CellList) -> (String, &Logic) {
+    locate_type(|logic: &Logic| logic.dx >= dx && logic.bits >= bits, 
+        logics)
+}
+
+fn locate_switch(voltage: Float, dx: Float, switches: &CellList) -> (String, &Switch) {
+    locate_type(|switch: &Switch| switch.dx >= dx && switch.voltage >= voltage, 
+    switches)
+}
+
+fn locate_core(config: &Config, core: &CellList) -> (String, Core) {
+    let name = config.retrieve("cell").to_string();
+    let cell = core.get(&name)
+        .expect(eliteral!("Could not find target cell"));
+
+    match cell {
+        Cell::Core(x) => (name, *x),
+        _ => panic!(eliteral!("Core is not of type Cell::Core"))
+    }
+}
+
+pub fn tabulate(config: &Config, db: &DB) -> Report {
+    let mut results: Report = Vec::new();
+
+    let n = config.retrieve("n").to_f32();
+    let m = config.retrieve("m").to_f32();
+
+    // Core area
+    let (name, core) = locate_core(config, db.retrieve(CellType::Core));
+    results.push((format!("CELL {}", name), core.dims.area(n, m)));
+
+    let switches = db.retrieve(CellType::Switch);
+    let logics = db.retrieve(CellType::Logic);
+
+    // WL peripheral area
+    if let Some(v) = config.get("wl") {
+        let dx = n * core.dx_wl;
+
+        for voltage in v.as_vec() {
+            let (target, switch) = locate_switch(*voltage, dx, switches);
+            results.push((format!("WL   {}", target), switch.dims.area(n, ONE)));
         }
-    }
-    
-    // Get BL logic area
-    let (target, driver) = locate_logic(dx_bl * LOGIC_SCALE, bits_bl, &db.logic);
-    results.insert(format!("BL   {}", target), driver.unwrap().area(1, config.m));
 
-    // Get well drivers and compute area
-    for voltage in &config.well {
-        let (target, driver) = locate_driver(*voltage, dx_well, &db.switches);
-        if driver.is_some() {
-            results.insert(format!("WELL {}", target), driver.unwrap().area(1, config.m));
+        let bits = (v.as_vec().len() as Float).log2().ceil();
+        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
+        results.push((format!("WL   {}", target), logic.dims.area(n, ONE)));
+    }
+
+    // BL peripheral area
+    if let Some(v) = config.get("bl") {
+        let dx = m * core.dx_bl;
+
+        for voltage in v.as_vec() {
+            let (target, switch) = locate_switch(*voltage, dx, switches);
+            results.push((format!("BL   {}", target), switch.dims.area(ONE, m)));
         }
+
+        let bits = (v.as_vec().len() as Float).log2().ceil();
+        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
+        results.push((format!("BL   {}", target), logic.dims.area(ONE, m)));
     }
 
-    // Get ADC area
-    let mm_n = config.enob < 0.0 || config.fs < 0.0 || config.adcs < 0;
-    let mm_na = !(config.enob < 0.00 && config.fs < 0.0 && config.adcs < 0);
-    if (config.enob > 0.0) && (config.fs > 0.0) && (config.adcs > 0) {
-        let (target, adc) = locate_adc(config.fs, config.enob.ceil() as i32, &db.adcs);
-        results.insert(format!("ADC  {}", target), adc.unwrap().area(1, config.adcs));
+    // Well peripheral area
+    if let Some(v) = config.get("well") {
+        let dx = n * (core.dx_bl + core.dx_wl) / 2.0 * WELL_SCALE;
+
+        for voltage in v.as_vec() {
+            let (target, switch) = locate_switch(*voltage, dx, switches);
+            results.push((format!("WELL {}", target), switch.dims.area(ONE, m)));
+        }
+
+        let bits = (v.as_vec().len() as Float).log2().ceil();
+        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
+        results.push((format!("WELL {}", target), logic.dims.area(ONE, ONE)));
     }
-    else if mm_n && mm_na {
-        eprintln!("WARNING: ADC configuration error; ADCs will not be generated");
+
+    // ADC area
+    let enob = config.get("enob");
+    let fs = config.get("fs");
+    let adcs = config.get("adcs");
+
+    if enob.is_some() && fs.is_some() && adcs.is_some() {
+        let (target, adc) = locate_adc(fs.unwrap().to_f32(), enob.unwrap().to_f32(), db.retrieve(CellType::ADC));
+        results.push((format!("ADC  {}", target), adc.dims.area(ONE, adcs.unwrap().to_f32())));
+    }
+    else {
+        eprintln!("WARNING: Missing ADC config info; ADCs will not be generated");
     }
 
     results
