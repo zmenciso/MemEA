@@ -1,5 +1,5 @@
 [package]
-name = "mem_ea"
+name = "memea"
 authors = ["Zephan Enciso <zmenciso@pm.me>"]
 version = "0.1.0"
 edition = "2021"

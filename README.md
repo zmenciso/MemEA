@@ -12,7 +12,7 @@ Install the latest version of `rustup`, then run:
 cargo build --release
 ```
 
-The output executable will be `target/release/mem_ea`.
+The output executable will be `target/release/memea`.
 
 # Usage
 
@@ -136,3 +136,4 @@ high voltage.
   - Support for driving negative voltages
   - Support for individual wells per row/column (for write/verify in FeFET,
     etc.)
+  - Interactive mode
