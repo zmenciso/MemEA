@@ -73,7 +73,7 @@ pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<Pat
             Type,\
             Count,\
             Location,\
-            Area\n");
+            Area (um2)\n");
     }
 
     for i in 0 .. reports.len() {
