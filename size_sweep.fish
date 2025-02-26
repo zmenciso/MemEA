@@ -51,9 +51,8 @@ function writeout -d "Write one configuration file"
 	end
 
 	if test $ADCS = 'all'
-		echo "adcs: $BL" >> $filename
-	end
-	if test -n $ADCS
+		echo "adcs: $m" >> $filename
+	else if test -n $ADCS
 		echo "adcs: $ADCS" >> $filename
 	end
 
