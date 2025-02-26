@@ -3,8 +3,8 @@ use clap::Parser;
 use std::error::Error;
 use std::path::PathBuf;
 
-use mem_ea::*;
-use mem_ea::config::Config;
+use memea::*;
+use memea::config::Config;
 
 const DEFAULT_DB: &str = "./data/db.txt";
 

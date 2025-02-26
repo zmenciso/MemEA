@@ -61,12 +61,10 @@ enum ValueTypes {
 /// Decodes string input into Value
 ///
 /// # Arguments
-///
 /// * `input` - Value to be decoded 
 /// * `kind` - Data type of `input` constrained by `Target`
 ///
 /// # Panics
-///
 /// Incorrect `kind` for `input`
 fn decode(input: &str, kind: ValueTypes) -> Value {
     match kind {

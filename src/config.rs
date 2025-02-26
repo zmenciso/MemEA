@@ -27,12 +27,10 @@ impl Config {
     /// where `x` is the previous value.  Returns None if `key` is a new option
     ///
     /// # Arguments
-    ///
     /// * `key` - Name of the option to insert
     /// * `value` - Value of the option (of type Target)
     ///
     /// # Panics
-    ///
     /// Unrecognized options
     pub fn update(&mut self, key: &str, value: &str) -> Option<Value> {
         let option = key.to_owned();
@@ -60,6 +58,10 @@ impl Config {
     }
 }
 
+/// Reads configuration from file and returns a `Config` struct result.
+///
+/// # Arguments
+/// * `filename` - Path of the file to read (`PathBuf`)
 pub fn read(filename: &std::path::PathBuf) -> Result<Config, io::Error> {
     let mut config = Config::new(filename);
 

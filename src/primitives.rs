@@ -22,6 +22,12 @@ impl DB {
         }
     }
 
+    /// Insert cell into database
+    ///
+    /// # Arguments
+    /// * `name` - Pointer to string containing cell name
+    /// * `kind` - Type of cell (switch, adc, etc.) as `CellType`
+    /// * `cell` - Cell to insert
     fn insert(&mut self, name: &str, kind: CellType, cell: Cell) {
         if let Some(d) = self.cells.get_mut(&kind) {
             d.insert(name.to_owned(), cell);
@@ -33,6 +39,11 @@ impl DB {
         }
     }
 
+    /// Add new cell to database
+    ///
+    /// # Arguments
+    /// * `name` - Pointer to string containing cell name
+    /// * `cell` - Cell to insert
     pub fn update(&mut self, name: &str, cell: Cell) {
         match cell {
             Cell::Core(_) => {
@@ -50,6 +61,13 @@ impl DB {
         }
     }
 
+    /// Retrieve a list of cells based on specified type
+    ///
+    /// # Arguments 
+    /// * `kind` - Which type of cells to return.  Filters output list
+    ///
+    /// # Panics
+    /// No cells of specified type found in database
     pub fn retrieve(&self, kind: CellType) -> &CellList {
         self.cells.get(&kind)
             .expect(eliteral!("No cells found in database"))
@@ -158,6 +176,14 @@ impl Geometry for ADC {
     fn as_any(&self) -> &dyn Any { self }
 }
 
+/// Add a property to a given cell
+///
+/// # Arguments
+/// * `cell` - Cell to update
+/// * `line` - Text line to read for adding properties
+///
+/// # Panics
+/// No property or value found on database line
 fn update_cell(cell: &mut Cell, line: &str) {
     let mut iter = line.split_whitespace();
     let target = iter.next()
@@ -212,6 +238,15 @@ fn update_cell(cell: &mut Cell, line: &str) {
     }
 }
 
+/// Builds a cell database from an input file
+///
+/// # Arguments 
+/// * `filename` - Path for the file to read
+///
+/// # Panics
+/// Cannot decode line from file
+/// Could not parse cell type definition
+/// Invalid cell types
 pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, io::Error>{
     let file = fs::File::open(filename)?;
     let rdr = BufReader::new(file);
