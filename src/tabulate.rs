@@ -1,7 +1,7 @@
 use std::process;
 
 use crate::eliteral;
-use crate::{Report, Float};
+use crate::{Reports, Report, Float};
 use crate::config::Config;
 use crate::primitives::*;
 
@@ -34,6 +34,7 @@ fn locate(condition: impl Fn(&dyn Geometry) -> bool, cells: &CellList) -> (Strin
         }
     }
 
+    // TODO: Output which type of cell we failed to find
     match sel {
         Some(x) => (target, x),
         None => {
@@ -86,15 +87,21 @@ fn locate_core(config: &Config, core: &CellList) -> (String, Core) {
     }
 }
 
-pub fn tabulate(config: &Config, db: &DB) -> Report {
-    let mut results: Report = Vec::new();
+pub fn tabulate(config: &Config, db: &DB) -> Reports {
+    let mut results: Reports = Vec::new();
 
     let n = config.retrieve("n").to_f32();
     let m = config.retrieve("m").to_f32();
 
     // Core area
     let (name, core) = locate_core(config, db.retrieve(CellType::Core));
-    results.push((format!("CELL {}", name), core.dims.area(n, m)));
+    let report = Report {
+        name,
+        kind: CellType::Core,
+        loc: String::from("Array"),
+        area: core.dims.area(n, m)
+    };
+    results.push(report);
 
     let switches = db.retrieve(CellType::Switch);
     let logics = db.retrieve(CellType::Logic);
@@ -105,12 +112,24 @@ pub fn tabulate(config: &Config, db: &DB) -> Report {
 
         for voltage in v.as_vec() {
             let (target, switch) = locate_switch(*voltage, dx, switches);
-            results.push((format!("WL   {}", target), switch.dims.area(n, ONE)));
+            let report = Report {
+                name: target,
+                kind: CellType::Switch,
+                loc: String::from("WL"),
+                area: switch.dims.area(n, ONE)
+            };
+            results.push(report);
         }
 
         let bits = (v.as_vec().len() as Float).log2().ceil();
         let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
-        results.push((format!("WL   {}", target), logic.dims.area(n, ONE)));
+        let report = Report {
+            name: target,
+            kind: CellType::Logic,
+            loc: String::from("WL"),
+            area: logic.dims.area(n, ONE)
+        };
+        results.push(report);
     }
 
     // BL peripheral area
@@ -119,12 +138,24 @@ pub fn tabulate(config: &Config, db: &DB) -> Report {
 
         for voltage in v.as_vec() {
             let (target, switch) = locate_switch(*voltage, dx, switches);
-            results.push((format!("BL   {}", target), switch.dims.area(ONE, m)));
+            let report = Report {
+                name: target,
+                kind: CellType::Switch,
+                loc: String::from("BL"),
+                area: switch.dims.area(ONE, m)
+            };
+            results.push(report);
         }
 
         let bits = (v.as_vec().len() as Float).log2().ceil();
         let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
-        results.push((format!("BL   {}", target), logic.dims.area(ONE, m)));
+        let report = Report {
+            name: target,
+            kind: CellType::Logic,
+            loc: String::from("BL"),
+            area: logic.dims.area(ONE, m)
+        };
+        results.push(report);
     }
 
     // Well peripheral area
@@ -133,12 +164,24 @@ pub fn tabulate(config: &Config, db: &DB) -> Report {
 
         for voltage in v.as_vec() {
             let (target, switch) = locate_switch(*voltage, dx, switches);
-            results.push((format!("WELL {}", target), switch.dims.area(ONE, m)));
+            let report = Report {
+                name: target,
+                kind: CellType::Switch,
+                loc: String::from("Well"),
+                area: switch.dims.area(ONE, m)
+            };
+            results.push(report);
         }
 
         let bits = (v.as_vec().len() as Float).log2().ceil();
         let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
-        results.push((format!("WELL {}", target), logic.dims.area(ONE, ONE)));
+        let report = Report {
+            name: target,
+            kind: CellType::Logic,
+            loc: String::from("Well"),
+            area: logic.dims.area(ONE, ONE)
+        };
+        results.push(report);
     }
 
     // ADC area
@@ -148,7 +191,13 @@ pub fn tabulate(config: &Config, db: &DB) -> Report {
 
     if enob.is_some() && fs.is_some() && adcs.is_some() {
         let (target, adc) = locate_adc(fs.unwrap().to_f32(), enob.unwrap().to_f32(), db.retrieve(CellType::ADC));
-        results.push((format!("ADC  {}", target), adc.dims.area(ONE, adcs.unwrap().to_f32())));
+        let report = Report {
+            name: target,
+            kind: CellType::ADC,
+            loc: String::from("Array"),
+            area: adc.dims.area(ONE, adcs.unwrap().to_f32())
+        };
+        results.push(report);
     }
     else {
         eprintln!("WARNING: Missing ADC config info; ADCs will not be generated");

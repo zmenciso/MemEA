@@ -44,16 +44,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
 
     if verbose { println!("Building solution..."); }
-    let reports: Vec<Report> = configs.iter()
+    let reports: Vec<Reports> = configs.iter()
         .map(|c| tabulate::tabulate(c, &db))
         .collect();
 
     assert_eq!(configs.len(), reports.len());
 
-    for i in 0 .. reports.len() {
-        match args.area_only {
-            true => { println!("{}\t{}", &configs[i].path, export::area(&reports[i])); }
-            false => { export::export(&configs[i].path, &reports[i], &args.export); }
+    match args.area_only {
+        true => {
+            for i in 0 .. reports.len() {
+                println!("{}\t{}", &configs[i].path, export::area(&reports[i]));
+            }
+        }
+        false => {
+            let names: Vec<String> = configs.iter()
+                .map(|c| c.path.to_string())
+                .collect();
+
+            export::export(names, &reports, &args.export);
         }
     }
 

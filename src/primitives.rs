@@ -3,6 +3,7 @@ use std::any::Any;
 use std::fs;
 use std::io;
 use std::io::{BufRead, BufReader};
+use std::fmt;
 
 use crate::eliteral;
 use crate::Float;
@@ -121,6 +122,17 @@ pub enum CellType {
     Logic,
     ADC,
     Switch
+}
+
+impl fmt::Display for CellType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+       match self {
+           CellType::ADC => write!(f, "ADC"),
+           CellType::Core => write!(f, "Core"),
+           CellType::Logic => write!(f, "Logic"),
+           CellType::Switch => write!(f, "Switch")
+       }
+    }
 }
 
 pub trait Geometry {

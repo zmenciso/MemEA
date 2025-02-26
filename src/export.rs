@@ -1,8 +1,9 @@
-use std::fs::{OpenOptions, File};
+use std::fs::{OpenOptions, File, metadata};
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::process;
 
-use crate::{eliteral, Report};
+use crate::{eliteral, Reports};
 
 /// Write string content to buffer
 ///
@@ -19,14 +20,13 @@ fn writeout(content: &str, buf: Option<File>) {
     }.expect(eliteral!("Could not write bytes to file"));
 }
 
-pub fn area(reports: &Report) -> f32 {
+pub fn area(reports: &Reports) -> f32 {
     reports.iter()
-        .map(|&(_, value)| value)
+        .map(|r| r.area)
         .sum()
 }
 
-/// Exports `Report` to file.
-/// TODO: If exporting to a file (not stdout), format as CSV
+/// Exports reports as CSV file or as human-readable output to stdout
 ///
 /// # Arguments
 /// * `input` - Name of the configuration to export
@@ -35,12 +35,27 @@ pub fn area(reports: &Report) -> f32 {
 ///
 /// # Panics
 /// Could not open output file for writing
-pub fn export(input: &str, report: &Report, filename: &Option<PathBuf>) {
+/// Cannot read user input during prompt from stdin
+pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<PathBuf>) {
     let buf = match filename {
         Some(x) => {
+            if metadata(x).is_ok() {
+                println!("Warning: '{}' already exists.  Overwrite? (Y/n)", x.to_string_lossy());
+
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)
+                    .expect("Error: Could not read user input");
+
+                if input.trim().to_lowercase() == "n" {
+                    println!("Aborting...");
+                    process::exit(147);
+                }
+            }
+
             let f = OpenOptions::new()
-                .append(true)
+                .write(true)
                 .create(true)
+                .truncate(true)
                 .open(x)
                 .expect(eliteral!("Could not open file"));
 
@@ -49,14 +64,62 @@ pub fn export(input: &str, report: &Report, filename: &Option<PathBuf>) {
         None => None
     };
 
-    let mut content = format!("\nConfiguration: {}\n\
-        Area breakdown:\n", input);
+    let mut content = String::new();
 
-    for (name, area) in report.iter() {
-        content = format!("{}    {:<24} | {:>10.1} μm²\n", content, name, area);
+    if buf.is_some() {
+        // Print CSV header
+        content = String::from("Configuration,\
+            Name,\
+            Type,\
+            Location,\
+            Area\n");
     }
 
-    content = format!("{}Total area: {:.1} μm²\n", content, area(report));
+    for i in 0 .. reports.len() {
+        if buf.is_none() {
+            content = fmt_direct(&inputs[i], &reports[i]);
+        }
+        else {
+            content = format!("{}{}", content, fmt_csv(&inputs[i], &reports[i]));
+        }
+    }
 
     writeout(&content, buf);
+
+}
+
+fn fmt_csv(input: &str, reports: &Reports) -> String {
+    let mut content = String::new();
+
+    for report in reports.iter() {
+        content = format!("{}{},{},{},{},{}\n",
+            content,
+            input,
+            report.name,
+            report.kind,
+            report.loc,
+            report.area);
+    }
+
+    content
+}
+
+fn fmt_direct(input: &str, reports: &Reports) -> String {
+    let mut content = format!("\nConfiguration: {}\n\
+        Area breakdown:\n    \
+        Name                 | Type     | Location | Area (μm²)\n    \
+        ---------------------|----------|----------|---------------\n", input);
+
+    for report in reports.iter() {
+        content = format!("{}    {:<20} | {:<8} | {:<8} | {:<10.1}\n",
+            content,
+            report.name,
+            report.kind.to_string(),
+            report.loc,
+            report.area);
+    }
+
+    content = format!("{}Total area: {:.1} μm²\n", content, area(reports));
+
+    content
 }

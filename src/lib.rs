@@ -3,7 +3,9 @@ pub mod primitives;
 pub mod tabulate;
 pub mod export;
 
-pub type Report = Vec<(String, f32)>;
+use crate::primitives::CellType;
+
+// pub type Report = Vec<(String, f32)>;
 pub type Float = f32;
 
 #[macro_export]
@@ -13,6 +15,14 @@ macro_rules! eliteral {
     };
 }
 
+pub struct Report {
+    pub name: String,
+    pub kind: CellType,
+    pub loc: String,
+    pub area: f32
+}
+
+pub type Reports = Vec<Report>;
 
 #[derive (Debug, PartialEq)]
 pub enum Value {
