@@ -46,7 +46,7 @@ A full list of options is provided below:
 | `wl` | `array[float]` | Required wordline voltages.  A voltage of -1 V indicates a high-Z mode. | `4, 2.5, 0` |
 | `well` | `array[float]` | Required well voltages (to bias a row-wise, column-wise or full-array deep n-well). | `0, 4` |
 | `cell` | `string` | Which in the database to use as the memory cell. | `2FeFET_TCAM_100` |
-| `enob` | `float` | Minimum ENOB for downstream ADCs (also supports sense-amplifiers and other single-bit data conversion) | `1` |
+| `enob` | `int` | Minimum ENOB for downstream ADCs (also supports sense-amplifiers and other single-bit data conversion) | `1` |
 | `fs` | `float` | ADC sampling rate | `1e9` |
 | `adcs` | `int` | Number of ADCs per array | `64` |
 
@@ -130,10 +130,48 @@ high voltage.
 | `bits` | `float` | ENOB of the ADC | `6.2` |
 | `fs` | `float` | Maximum sampling rate of the ADC | `2e9` |
 
+# Helper Scripts
+
+## `size_sweep.fish`
+
+This script provides a convenient way to generate all the size configurations of
+`N` and `M` for a given array configuration.  The user must set the following
+parameters:
+
+```fish
+set OUTPUT_DIR cim_sweep
+
+set N 16 32 64 128 256
+set M 16 32 64 128 256
+
+set BL '1, 2, 0, -1'
+set WL '4, 2.5, 0, 1'
+set WELL '0, 4'
+set CELL 1FeFET_100
+
+# Optional parameters - leave empty to exclude from output configurations
+set ENOB 6
+set FS 100e6
+
+# ADCs (optional): Set to 'all' to match BLs, otherwise specify number
+set ADCS all
+```
+
+Then, run the script:
+
+```bash
+fish size_sweep.fish
+```
+
 # Planned Features
 
-  - CSV file output 
   - Support for driving negative voltages
-  - Support for individual wells per row/column (for write/verify in FeFET,
-    etc.)
+  - Support for shared peripherals across multiple memory arrays (e.g. BL
+    drivers alternate between driving two different arrays)
+  - Stacking multiple switches per row/column to achieve the required drive
+    strength
   - Interactive mode
+  - Better configuration system (i.e. specify variable sweeps within the
+    configuration file)
+  - [Performance] Reduce the number of times file descriptors are opened and
+    closed
