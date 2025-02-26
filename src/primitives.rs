@@ -7,7 +7,7 @@ use std::fmt;
 
 use crate::eliteral;
 use crate::Float;
-use crate::parse;
+use crate::{parse_float, parse_usize};
 
 pub type CellList = HashMap<String, Cell>;
 
@@ -91,9 +91,9 @@ impl Dims {
         }
     }
 
-    pub fn area(self, n: Float, m: Float) -> Float {
-        ((m * self.width) + self.enc) * 
-            (n * self.height) + self.enc
+    pub fn area(self, n: usize, m: usize) -> Float {
+        ((m as f32 * self.width) + self.enc) * 
+            (n as f32 * self.height) + self.enc
     }
 }
 
@@ -106,7 +106,7 @@ pub enum Cell {
 }
 
 impl Cell {
-    pub fn area(&self, n: Float, m: Float) -> Float {
+    pub fn area(&self, n: usize, m: usize) -> Float {
         match self {
             Cell::Core(core) => core.dims.area(n, m),
             Cell::Logic(logic) => logic.dims.area(n, m),
@@ -157,7 +157,7 @@ pub struct Logic {
     pub dims: Dims,
     pub dx: Float,
     pub fs: Float,
-    pub bits: Float,
+    pub bits: usize,
 }
 
 impl Geometry for Logic {
@@ -180,7 +180,7 @@ impl Geometry for Switch {
 #[derive (PartialEq, Debug, Copy, Clone)]
 pub struct ADC {
     pub dims: Dims,
-    pub bits: Float,
+    pub bits: usize,
     pub fs: Float
 }
 impl Geometry for ADC {
@@ -208,42 +208,42 @@ fn update_cell(cell: &mut Cell, line: &str) {
     match cell {
         Cell::Core(core) => {
             match target.as_str() {
-                "dx_wl" => { core.dx_wl = parse(&value) },
-                "dx_bl" => { core.dx_bl = parse(&value) },
-                "width" => { core.dims.width = parse(&value) },
-                "height" => { core.dims.height = parse(&value) },
-                "enc" => { core.dims.enc = parse(&value) },
+                "dx_wl" => { core.dx_wl = parse_float(&value) },
+                "dx_bl" => { core.dx_bl = parse_float(&value) },
+                "width" => { core.dims.width = parse_float(&value) },
+                "height" => { core.dims.height = parse_float(&value) },
+                "enc" => { core.dims.enc = parse_float(&value) },
                 _ => {},
             }
         },
         Cell::Logic(logic) => {
             match target.as_str() {
-                "dx" => { logic.dx = parse(&value) },
-                "bits" => { logic.bits = parse(&value) },
-                "fs" => { logic.fs = parse(&value) },
-                "width" => { logic.dims.width = parse(&value) },
-                "height" => { logic.dims.height = parse(&value) },
-                "enc" => { logic.dims.enc = parse(&value) },
+                "dx" => { logic.dx = parse_float(&value) },
+                "bits" => { logic.bits = parse_usize(&value) },
+                "fs" => { logic.fs = parse_float(&value) },
+                "width" => { logic.dims.width = parse_float(&value) },
+                "height" => { logic.dims.height = parse_float(&value) },
+                "enc" => { logic.dims.enc = parse_float(&value) },
                 _ => {},
             }
         },
         Cell::Switch(switch) => {
             match target.as_str() {
-                "dx" => { switch.dx = parse(&value) },
-                "voltage" => { switch.voltage = parse(&value) },
-                "width" => { switch.dims.width = parse(&value) },
-                "height" => { switch.dims.height = parse(&value) },
-                "enc" => { switch.dims.enc = parse(&value) },
+                "dx" => { switch.dx = parse_float(&value) },
+                "voltage" => { switch.voltage = parse_float(&value) },
+                "width" => { switch.dims.width = parse_float(&value) },
+                "height" => { switch.dims.height = parse_float(&value) },
+                "enc" => { switch.dims.enc = parse_float(&value) },
                 _ => {},
             }
         },
         Cell::ADC(adc) => {
             match target.as_str() {
-                "bits" => { adc.bits = parse(&value) },
-                "fs" => { adc.fs = parse(&value) },
-                "width" => { adc.dims.width = parse(&value) },
-                "height" => { adc.dims.height = parse(&value) },
-                "enc" => { adc.dims.enc = parse(&value) },
+                "bits" => { adc.bits = parse_usize(&value) },
+                "fs" => { adc.fs = parse_float(&value) },
+                "width" => { adc.dims.width = parse_float(&value) },
+                "height" => { adc.dims.height = parse_float(&value) },
+                "enc" => { adc.dims.enc = parse_float(&value) },
                 _ => {},
             }
         }
@@ -295,12 +295,12 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, io::Error>{
                     dims: Dims::new(),
                     dx: 0.0,
                     fs: 0.0,
-                    bits: 0.0,
+                    bits: 0,
                 })),
                 "adc" => Some(Cell::ADC( ADC{
                     dims: Dims::new(),
                     fs: 0.0,
-                    bits: 0.0
+                    bits: 0
                 })),
                 "switch" => Some(Cell::Switch( Switch{
                     dims: Dims::new(),

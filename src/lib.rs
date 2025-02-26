@@ -17,6 +17,7 @@ macro_rules! eliteral {
 
 pub struct Report {
     pub name: String,
+    pub count: usize,
     pub kind: CellType,
     pub loc: String,
     pub area: f32
@@ -27,6 +28,7 @@ pub type Reports = Vec<Report>;
 #[derive (Debug, PartialEq)]
 pub enum Value {
     Float(f32),
+    Usize(usize),
     String(String),
     FloatVec(Vec<f32>),
 }
@@ -36,7 +38,14 @@ impl Value {
     fn to_f32(&self) -> f32 {
         match self {
             Value::Float(num) => *num,
-            _ => panic!(eliteral!("Expected a Value::Num")),
+            _ => panic!(eliteral!("Expected a Value::Float")),
+        }
+    }
+
+    fn to_usize(&self) -> usize {
+        match self {
+            Value::Usize(num) => *num,
+            _ => panic!(eliteral!("Expected a Value::Usize"))
         }
     }
 
@@ -64,6 +73,7 @@ impl Value {
 
 enum ValueTypes {
     Float,
+    Usize,
     String,
     FloatVec
 }
@@ -78,7 +88,8 @@ enum ValueTypes {
 /// Incorrect `kind` for `input`
 fn decode(input: &str, kind: ValueTypes) -> Value {
     match kind {
-        ValueTypes::Float => Value::Float(parse(input)),
+        ValueTypes::Float => Value::Float(parse_float(input)),
+        ValueTypes::Usize => Value::Usize(parse_usize(input)),
         ValueTypes::String => Value::String(input.to_owned()),
         ValueTypes::FloatVec => Value::FloatVec(input.split(',')
             .map(|x| x.trim().parse::<Float>()
@@ -87,7 +98,12 @@ fn decode(input: &str, kind: ValueTypes) -> Value {
     }
 }
 
-fn parse(input: &str) -> Float {
+fn parse_float(input: &str) -> Float {
     input.parse::<Float>()
         .expect(eliteral!("Could not parse float"))
+}
+
+fn parse_usize(input: &str) -> usize {
+    input.parse::<usize>()
+        .expect(eliteral!("Could not parse usize"))
 }

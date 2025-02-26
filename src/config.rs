@@ -35,10 +35,10 @@ impl Config {
     pub fn update(&mut self, key: &str, value: &str) -> Option<Value> {
         let option = key.to_owned();
         match key {
-            "n"     => { self.config.insert(option, decode(value, ValueTypes::Float)) },
-            "m"     => { self.config.insert(option, decode(value, ValueTypes::Float)) },
-            "adcs"  => { self.config.insert(option, decode(value, ValueTypes::Float)) },
-            "enob"  => { self.config.insert(option, decode(value, ValueTypes::Float)) },
+            "n"     => { self.config.insert(option, decode(value, ValueTypes::Usize)) },
+            "m"     => { self.config.insert(option, decode(value, ValueTypes::Usize)) },
+            "adcs"  => { self.config.insert(option, decode(value, ValueTypes::Usize)) },
+            "enob"  => { self.config.insert(option, decode(value, ValueTypes::Usize)) },
             "fs"    => { self.config.insert(option, decode(value, ValueTypes::Float)) },
             "bl"    => { self.config.insert(option, decode(value, ValueTypes::FloatVec)) },
             "wl"    => { self.config.insert(option, decode(value, ValueTypes::FloatVec)) },

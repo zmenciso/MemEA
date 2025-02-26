@@ -71,16 +71,21 @@ pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<Pat
         content = String::from("Configuration,\
             Name,\
             Type,\
+            Count,\
             Location,\
             Area\n");
     }
 
     for i in 0 .. reports.len() {
         if buf.is_none() {
-            content = fmt_direct(&inputs[i], &reports[i]);
+            content = format!("{}{}", 
+                content, 
+                fmt_direct(&inputs[i], &reports[i]));
         }
         else {
-            content = format!("{}{}", content, fmt_csv(&inputs[i], &reports[i]));
+            content = format!("{}{}", 
+                content, 
+                fmt_csv(&inputs[i], &reports[i]));
         }
     }
 
@@ -92,11 +97,12 @@ fn fmt_csv(input: &str, reports: &Reports) -> String {
     let mut content = String::new();
 
     for report in reports.iter() {
-        content = format!("{}{},{},{},{},{}\n",
+        content = format!("{}{},{},{},{},{},{}\n",
             content,
             input,
             report.name,
             report.kind,
+            report.count,
             report.loc,
             report.area);
     }
@@ -107,14 +113,15 @@ fn fmt_csv(input: &str, reports: &Reports) -> String {
 fn fmt_direct(input: &str, reports: &Reports) -> String {
     let mut content = format!("\nConfiguration: {}\n\
         Area breakdown:\n    \
-        Name                 | Type     | Location | Area (μm²)\n    \
-        ---------------------|----------|----------|---------------\n", input);
+        Name                 | Type     | Count    | Location | Area (μm²)\n    \
+        ---------------------|----------|----------|----------|------------\n", input);
 
     for report in reports.iter() {
-        content = format!("{}    {:<20} | {:<8} | {:<8} | {:<10.1}\n",
+        content = format!("{}    {:<20} | {:<8} | {:<8} | {:<8} | {:>11.1}\n",
             content,
             report.name,
             report.kind.to_string(),
+            report.count,
             report.loc,
             report.area);
     }
