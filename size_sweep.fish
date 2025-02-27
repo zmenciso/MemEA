@@ -42,17 +42,17 @@ function writeout -d "Write one configuration file"
 	echo "well: $WELL" >> $filename
 	echo "cell: $CELL" >> $filename
 
-	if test -n $ENOB 
+	if test -n "$ENOB"
 		echo "enob: $ENOB" >> $filename
 	end
 
-	if test -n $FS
+	if test -n "$FS"
 		echo "fs: $FS" >> $filename
 	end
 
 	if test $ADCS = 'all'
 		echo "adcs: $m" >> $filename
-	else if test -n $ADCS
+	else if test -n "$ADCS"
 		echo "adcs: $ADCS" >> $filename
 	end
 
