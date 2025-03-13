@@ -165,6 +165,7 @@ fish size_sweep.fish
 
 # Planned Features
 
+  - Interactive/automatic database builder from GDS
   - Support for driving negative voltages
   - Support for shared peripherals across multiple memory arrays (e.g. BL
     drivers alternate between driving two different arrays)
@@ -173,5 +174,7 @@ fish size_sweep.fish
   - Interactive mode
   - Better configuration system (i.e. specify variable sweeps within the
     configuration file)
+  - Automatic enob calculation option based on the number of rows (assuming
+    1-bit per cell): `enob auto`
   - [Performance] Reduce the number of times file descriptors are opened and
     closed
