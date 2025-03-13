@@ -40,7 +40,7 @@ pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<Pat
     let buf = match filename {
         Some(x) => {
             if metadata(x).is_ok() {
-                println!("Warning: '{}' already exists.  Overwrite? (Y/n)", x.to_string_lossy());
+                print!("Warning: '{}' already exists.  Overwrite? (Y/n)", x.to_string_lossy());
 
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)
