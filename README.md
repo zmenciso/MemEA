@@ -82,11 +82,14 @@ All types of circuits require the following geometric properties:
 
 | Option | Type | Description | Example |
 |--------|------|-------------|---------|
-| `spc_x` | `float` | Minimum horizontal space between instances in an array, in μm | `0.432` |
-| `spc_y` | `float` | Minimum vertical space between instances in an array, in μm | `0.432` |
+| `spc_x` | `float` | Minimum horizontal space between instances in an array (pitch), in μm | `0.432` |
+| `spc_y` | `float` | Minimum vertical space between instances in an array (pitch), in μm | `0.432` |
 | `enc` | `float` | Spacing required between this circuit and any other circuit (e.g. considering well-to-well spacing), in μm | `1.48` |
 
 > Check back for a diagram explaining these properties
+
+> **Note**: `MemEA` assumes that cells cannot be rotated, as this is the case in
+> most advanced manufacturing nodes.
 
 Then, each of the four types has additional properties:
 
@@ -167,6 +170,7 @@ fish size_sweep.fish
 
   - Interactive/automatic database builder from GDS
   - Support for driving negative voltages
+  - Produce example/estimated floorplan for each configuration
   - Support for shared peripherals across multiple memory arrays (e.g. BL
     drivers alternate between driving two different arrays)
   - Stacking multiple switches per row/column to achieve the required drive
