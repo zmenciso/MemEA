@@ -5,8 +5,8 @@ pub mod export;
 
 use crate::primitives::CellType;
 
-// pub type Report = Vec<(String, f32)>;
 pub type Float = f32;
+pub type Mosaic = (usize, usize);
 
 #[macro_export]
 macro_rules! eliteral {
@@ -15,6 +15,7 @@ macro_rules! eliteral {
     };
 }
 
+#[derive (Debug)]
 pub struct Report {
     pub name: String,
     pub count: usize,

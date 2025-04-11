@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::fmt;
 
 use crate::eliteral;
-use crate::Float;
+use crate::{Float, Mosaic};
 use crate::{parse_float, parse_usize};
 
 pub type CellList = HashMap<String, Cell>;
@@ -91,9 +91,9 @@ impl Dims {
         }
     }
 
-    pub fn area(self, n: usize, m: usize) -> Float {
-        ((m as f32 * self.width) + self.enc) * 
-            (n as f32 * self.height) + self.enc
+    pub fn area(self, (n, m): Mosaic) -> Float {
+        ((m as Float * self.width) + self.enc) * 
+            ((n as Float * self.height) + self.enc)
     }
 }
 
@@ -106,12 +106,12 @@ pub enum Cell {
 }
 
 impl Cell {
-    pub fn area(&self, n: usize, m: usize) -> Float {
+    pub fn area(&self, mos: Mosaic) -> Float {
         match self {
-            Cell::Core(core) => core.dims.area(n, m),
-            Cell::Logic(logic) => logic.dims.area(n, m),
-            Cell::ADC(adc) => adc.dims.area(n, m),
-            Cell::Switch(switch) => switch.dims.area(n, m),
+            Cell::Core(core) => core.dims.area(mos),
+            Cell::Logic(logic) => logic.dims.area(mos),
+            Cell::ADC(adc) => adc.dims.area(mos),
+            Cell::Switch(switch) => switch.dims.area(mos),
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::process;
 
 use crate::eliteral;
-use crate::{Reports, Report, Float};
+use crate::{Reports, Report, Float, Mosaic};
 use crate::config::Config;
 use crate::primitives::*;
 
@@ -9,7 +9,9 @@ use crate::primitives::*;
 const WELL_SCALE: Float = 0.25;
 const LOGIC_SCALE: Float = 0.5;
 
-fn locate(condition: impl Fn(&dyn Geometry) -> bool, cells: &CellList) -> (String, &dyn Geometry) {
+const SINGLE: Mosaic = (1, 1);
+
+fn locate(condition: impl Fn(&dyn Geometry) -> bool, cells: &CellList, mos: Mosaic) -> (String, &dyn Geometry) {
     let mut target = String::new();
     let mut sel: Option<&dyn Geometry> = None;
 
@@ -26,7 +28,7 @@ fn locate(condition: impl Fn(&dyn Geometry) -> bool, cells: &CellList) -> (Strin
         }
         else if sel.is_some() && condition(cell) {
             let sel_dims = sel.unwrap().dims();
-            if cell.dims().area(1, 1) <= sel_dims.area(1, 1) {
+            if cell.dims().area(mos) <= sel_dims.area(mos) {
                 (target, sel) = (name.to_owned(), Some(cell));
             }
         }
@@ -42,7 +44,7 @@ fn locate(condition: impl Fn(&dyn Geometry) -> bool, cells: &CellList) -> (Strin
     }
 }
 
-fn locate_type<T: 'static>(condition: impl Fn(&T) -> bool, cells: &CellList) -> (String, &T) {
+fn locate_type<T: 'static>(condition: impl Fn(&T) -> bool, cells: &CellList, mos: Mosaic) -> (String, &T) {
     let (name, cell) = locate(
         |cell: &dyn Geometry| {
             if let Some(typed) = cell.as_any().downcast_ref::<T>() {
@@ -53,25 +55,32 @@ fn locate_type<T: 'static>(condition: impl Fn(&T) -> bool, cells: &CellList) -> 
             }
         },
         cells,
+        mos
     );
 
     (name, cell.as_any().downcast_ref::<T>().unwrap())
 
 }
 
-fn locate_adc(fs: Float, bits: usize, adcs: &CellList) -> (String, &ADC) {
+fn locate_adc(fs: Float, bits: usize, adcs: &CellList, mos: Mosaic) -> (String, &ADC) {
     locate_type(|adc: &ADC| adc.fs >= fs && adc.bits >= bits, 
-        adcs)
+        adcs,
+        mos
+    )
 }
 
-fn locate_logic(dx: Float, bits: usize, logics: &CellList) -> (String, &Logic) {
+fn locate_logic(dx: Float, bits: usize, logics: &CellList, mos: Mosaic) -> (String, &Logic) {
     locate_type(|logic: &Logic| logic.dx >= dx && logic.bits >= bits, 
-        logics)
+        logics,
+        mos
+    )
 }
 
-fn locate_switch(voltage: Float, dx: Float, switches: &CellList) -> (String, &Switch) {
+fn locate_switch(voltage: Float, dx: Float, switches: &CellList, mos: Mosaic) -> (String, &Switch) {
     locate_type(|switch: &Switch| switch.dx >= dx && switch.voltage >= voltage, 
-    switches)
+        switches,
+        mos
+    )
 }
 
 fn locate_core(config: &Config, core: &CellList) -> (String, Core) {
@@ -92,13 +101,14 @@ pub fn tabulate(config: &Config, db: &DB) -> Reports {
     let m = config.retrieve("m").to_usize();
 
     // Core area
+    let mos = (n, m);
     let (name, core) = locate_core(config, db.retrieve(CellType::Core));
     let report = Report {
         name,
         count: n * m,
         kind: CellType::Core,
         loc: String::from("Array"),
-        area: core.dims.area(n, m)
+        area: core.dims.area(mos)
     };
     results.push(report);
 
@@ -106,85 +116,88 @@ pub fn tabulate(config: &Config, db: &DB) -> Reports {
     let logics = db.retrieve(CellType::Logic);
 
     // WL peripheral area
+    let mos = (n, 1);
     if let Some(v) = config.get("wl") {
         let dx = n as f32 * core.dx_wl;
 
         for voltage in v.as_vec() {
-            let (target, switch) = locate_switch(*voltage, dx, switches);
+            let (target, switch) = locate_switch(*voltage, dx, switches, mos);
             let report = Report {
                 name: target,
                 count: n,
                 kind: CellType::Switch,
                 loc: String::from("WL"),
-                area: switch.dims.area(n, 1)
+                area: switch.dims.area(mos)
             };
             results.push(report);
         }
 
         let bits = (v.as_vec().len() as f32).log2().ceil() as usize;
-        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
+        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics, mos);
         let report = Report {
             name: target,
             count: n,
             kind: CellType::Logic,
             loc: String::from("WL"),
-            area: logic.dims.area(n, 1)
+            area: logic.dims.area(mos)
         };
         results.push(report);
     }
 
     // BL peripheral area
+    let mos = (1, m);
     if let Some(v) = config.get("bl") {
         let dx = m as f32 * core.dx_bl;
 
         for voltage in v.as_vec() {
-            let (target, switch) = locate_switch(*voltage, dx, switches);
+            let (target, switch) = locate_switch(*voltage, dx, switches, mos);
             let report = Report {
                 name: target,
                 count: m,
                 kind: CellType::Switch,
                 loc: String::from("BL"),
-                area: switch.dims.area(1, m)
+                area: switch.dims.area(mos)
             };
             results.push(report);
         }
 
         let bits = (v.as_vec().len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
+        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics, mos);
         let report = Report {
             name: target,
             count: m,
             kind: CellType::Logic,
             loc: String::from("BL"),
-            area: logic.dims.area(1, m)
+            area: logic.dims.area(mos)
         };
         results.push(report);
     }
 
     // Well peripheral area
+    let mos = (1, m);
     if let Some(v) = config.get("well") {
         let dx = n as f32 * ((core.dx_bl + core.dx_wl) / 2.0) * WELL_SCALE;
 
         for voltage in v.as_vec() {
-            let (target, switch) = locate_switch(*voltage, dx, switches);
+            let (target, switch) = locate_switch(*voltage, dx, switches, mos);
             let report = Report {
                 name: target,
                 count: m,
                 kind: CellType::Switch,
                 loc: String::from("Well"),
-                area: switch.dims.area(1, m)
+                area: switch.dims.area(mos)
             };
             results.push(report);
         }
 
         let bits = (v.as_vec().len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics);
+        let (target, logic) = locate_logic(dx*LOGIC_SCALE, bits, logics, SINGLE);
         let report = Report {
             name: target,
             count: 1,
             kind: CellType::Logic,
             loc: String::from("Well"),
-            area: logic.dims.area(1, 1)
+            area: logic.dims.area(SINGLE)
         };
         results.push(report);
     }
@@ -192,14 +205,15 @@ pub fn tabulate(config: &Config, db: &DB) -> Reports {
     // ADC area
     if let (Some(enob), Some(fs), Some(adcs)) = (config.get("enob"), config.get("fs"), config.get("adcs")) {
         let (enob, fs, adcs) = (enob.to_usize(), fs.to_f32(), adcs.to_usize());
+        let mos = (1, adcs);
 
-        let (target, adc) = locate_adc(fs, enob, db.retrieve(CellType::ADC));
+        let (target, adc) = locate_adc(fs, enob, db.retrieve(CellType::ADC), mos);
         let report = Report {
             name: target,
             count: adcs,
             kind: CellType::ADC,
             loc: String::from("BL"),
-            area: adc.dims.area(1, adcs)
+            area: adc.dims.area(mos)
         };
 
         results.push(report);
