@@ -13,11 +13,7 @@ pub type Mosaic = (usize, usize);
 #[macro_export]
 macro_rules! eliteral {
     ($literal:expr) => {
-        concat!(
-            "\\x1b[1;30;41mERROR (Unrecoverable): ",
-            $literal,
-            "\\x1b[0m"
-        )
+        concat!("\x1b[1;30;41mERROR (Unrecoverable): ", $literal, "\x1b[0m")
     };
 }
 
@@ -25,7 +21,7 @@ macro_rules! eliteral {
 macro_rules! errorln {
     ($literal:literal $(, $args:expr)* $(,)?) => {
         eprintln!(
-            concat!("\\x1b[31mERROR: ", $literal, "\\x1b[0m")
+            concat!("\x1b[31mERROR: ", $literal, "\x1b[0m")
             $(, $args)*
         )
     };
@@ -35,7 +31,7 @@ macro_rules! errorln {
 macro_rules! warnln {
     ($literal:literal $(, $args:expr)* $(,)?) => {
         eprintln!(
-            concat!("\\x1b[33mWARNING: ", $literal, "\\x1b[0m")
+            concat!("\x1b[33mWARNING: ", $literal, "\x1b[0m")
             $(, $args)*
         )
     };
@@ -45,7 +41,7 @@ macro_rules! warnln {
 macro_rules! infoln {
     ($literal:literal $(, $args:expr)* $(,)?) => {
         eprintln!(
-            concat!("\\x1b[32mINFO: ", $literal, "\\x1b[0m")
+            concat!("\x1b[32mINFO: ", $literal, "\x1b[0m")
             $(, $args)*
         )
     };

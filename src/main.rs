@@ -40,12 +40,12 @@ fn main() -> Result<(), MemeaError> {
     }
 
     if verbose {
-        println!("Building database...");
+        infoln!("Building database...");
     }
     let db = primitives::build_db(&args.db)?;
 
     if verbose {
-        println!("Reading configuration files...");
+        infoln!("Reading configuration files...");
     }
     let configs: Vec<Config> = args
         .config
@@ -66,7 +66,7 @@ fn main() -> Result<(), MemeaError> {
     };
 
     if verbose {
-        println!("Building solution...");
+        infoln!("Building solution...");
     }
     let reports: Vec<Reports> = configs
         .iter()
@@ -79,7 +79,7 @@ fn main() -> Result<(), MemeaError> {
     match args.area_only {
         true => {
             for i in 0..reports.len() {
-                println!("{}\t{}", &configs[i].path, export::area(&reports[i]));
+                infoln!("{}\t{}", &configs[i].path, export::area(&reports[i]));
             }
         }
         false => {

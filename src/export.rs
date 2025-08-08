@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
 
-use crate::{eliteral, Float, MemeaError, Reports};
+use crate::{infoln, warnln, Float, MemeaError, Reports};
 
 /// Write string content to buffer
 ///
@@ -37,8 +37,8 @@ pub fn export(
     let buf = match filename {
         Some(x) => {
             if metadata(x).is_ok() {
-                print!(
-                    "Warning: '{}' already exists.  Overwrite? (Y/n)",
+                warnln!(
+                    "'{}' already exists.  Overwrite? (Y/n)",
                     x.to_string_lossy()
                 );
 
@@ -46,7 +46,7 @@ pub fn export(
                 io::stdin().read_line(&mut input)?;
 
                 if input.trim().to_lowercase() == "n" {
-                    println!("Aborting...");
+                    infoln!("Aborting...");
                     process::exit(147);
                 }
             }
@@ -56,6 +56,8 @@ pub fn export(
                 .create(true)
                 .truncate(true)
                 .open(x)?;
+
+            infoln!("Wrote output to {:#?}", x);
 
             Some(f)
         }
