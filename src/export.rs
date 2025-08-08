@@ -3,22 +3,20 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
 
-use crate::{eliteral, Float, Reports};
+use crate::{eliteral, Float, MemeaError, Reports};
 
 /// Write string content to buffer
 ///
 /// # Arguments
 /// * `content` - Pointer to string content to write out
 /// * `buf` - Buffer created from OpenOptions.  If None, writes to stdout
-///
-/// # Panics
-/// Could not write bytes to the output file
-fn writeout(content: &str, buf: Option<File>) {
+fn writeout(content: &str, buf: Option<File>) -> Result<(), MemeaError> {
     match buf {
-        Some(mut file) => file.write_all(content.as_bytes()),
-        None => io::stdout().write_all(content.as_bytes()),
+        Some(mut file) => file.write_all(content.as_bytes())?,
+        None => io::stdout().write_all(content.as_bytes())?,
     }
-    .expect(eliteral!("Could not write bytes to file"));
+
+    Ok(())
 }
 
 pub fn area(reports: &Reports) -> Float {
@@ -31,11 +29,11 @@ pub fn area(reports: &Reports) -> Float {
 /// * `input` - Name of the configuration to export
 /// * `report` - Pointer to a `Report` to output
 /// * `filename` - Path of the output file to write.  If None, writes to stdout
-///
-/// # Panics
-/// Could not open output file for writing
-/// Cannot read user input during prompt from stdin
-pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<PathBuf>) {
+pub fn export(
+    inputs: Vec<String>,
+    reports: &Vec<Reports>,
+    filename: &Option<PathBuf>,
+) -> Result<(), MemeaError> {
     let buf = match filename {
         Some(x) => {
             if metadata(x).is_ok() {
@@ -45,9 +43,7 @@ pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<Pat
                 );
 
                 let mut input = String::new();
-                io::stdin()
-                    .read_line(&mut input)
-                    .expect("Error: Could not read user input");
+                io::stdin().read_line(&mut input)?;
 
                 if input.trim().to_lowercase() == "n" {
                     println!("Aborting...");
@@ -59,8 +55,7 @@ pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<Pat
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .open(x)
-                .expect(eliteral!("Could not open file"));
+                .open(x)?;
 
             Some(f)
         }
@@ -89,7 +84,9 @@ pub fn export(inputs: Vec<String>, reports: &Vec<Reports>, filename: &Option<Pat
         }
     }
 
-    writeout(&content, buf);
+    writeout(&content, buf)?;
+
+    Ok(())
 }
 
 fn fmt_csv(input: &str, reports: &Reports) -> String {

@@ -91,9 +91,6 @@ impl DB {
     ///
     /// # Arguments
     /// * `kind` - Which type of cells to return.  Filters output list
-    ///
-    /// # Panics
-    /// No cells of specified type found in database
     pub fn retrieve(&self, kind: CellType) -> Result<&CellList, DBError> {
         self.cells.get(&kind).ok_or(DBError::InvalidDatabase(kind))
     }
@@ -280,11 +277,6 @@ fn update_cell(cell: &mut Cell, line: &str) -> Result<(), MemeaError> {
 ///
 /// # Arguments
 /// * `filename` - Path for the file to read
-///
-/// # Panics
-/// Cannot decode line from file
-/// Could not parse cell type definition
-/// Invalid cell types
 pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, MemeaError> {
     let file = fs::File::open(filename)?;
     let rdr = BufReader::new(file);

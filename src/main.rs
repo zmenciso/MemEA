@@ -50,7 +50,8 @@ fn main() -> Result<(), MemeaError> {
     let configs: Vec<Config> = args
         .config
         .iter()
-        .map(|p| config::read(p).expect("Could not read configuration file"))
+        .map(|p| config::read(p))
+        .filter_map(Result::ok)
         .collect();
 
     let scale: Float = match args.scale {
