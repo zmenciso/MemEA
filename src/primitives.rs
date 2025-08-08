@@ -1,19 +1,45 @@
-use std::collections::HashMap;
 use std::any::Any;
-use std::fs;
-use std::io;
-use std::io::{BufRead, BufReader};
+use std::collections::HashMap;
 use std::fmt;
+use std::fs;
+use std::io::{BufRead, BufReader};
+use thiserror::Error;
 
-use crate::eliteral;
+use crate::MemeaError;
 use crate::{Float, Mosaic};
-use crate::{parse_float, parse_usize};
 
 pub type CellList = HashMap<String, Cell>;
 
+#[derive(Debug, Error)]
+pub enum DBError {
+    #[error("Cannot find database, or it is invalid: {0}")]
+    InvalidDatabase(CellType),
+
+    #[error("Cell is not of type {0}")]
+    InvalidCellType(CellType),
+
+    #[error("Unknown cell type: {0}")]
+    UnknownCellType(String),
+
+    #[error("Cannot find cell in database: {0}")]
+    MissingCell(String),
+
+    #[error("Malformed cell type definition line: {0}")]
+    InvalidCellDefinition(String),
+
+    #[error("Missing cell property on database line")]
+    MissingProperty,
+
+    #[error("Missing cell value on database line")]
+    MissingValue,
+
+    #[error("Failed to find suitable cell in database")]
+    NoSuitableCells,
+}
+
 #[derive(Debug)]
 pub struct DB {
-    cells: HashMap<CellType, CellList>, 
+    cells: HashMap<CellType, CellList>,
 }
 
 impl DB {
@@ -32,8 +58,7 @@ impl DB {
     fn insert(&mut self, name: &str, kind: CellType, cell: Cell) {
         if let Some(d) = self.cells.get_mut(&kind) {
             d.insert(name.to_owned(), cell);
-        }
-        else {
+        } else {
             let mut new: HashMap<String, Cell> = HashMap::new();
             new.insert(name.to_owned(), cell);
             self.cells.insert(kind, new);
@@ -64,14 +89,13 @@ impl DB {
 
     /// Retrieve a list of cells based on specified type
     ///
-    /// # Arguments 
+    /// # Arguments
     /// * `kind` - Which type of cells to return.  Filters output list
     ///
     /// # Panics
     /// No cells of specified type found in database
-    pub fn retrieve(&self, kind: CellType) -> &CellList {
-        self.cells.get(&kind)
-            .expect(eliteral!("No cells found in database"))
+    pub fn retrieve(&self, kind: CellType) -> Result<&CellList, DBError> {
+        self.cells.get(&kind).ok_or(DBError::InvalidDatabase(kind))
     }
 }
 
@@ -87,22 +111,21 @@ impl Dims {
         Dims {
             width: 0.0,
             height: 0.0,
-            enc: 0.0
+            enc: 0.0,
         }
     }
 
     pub fn area(self, (n, m): Mosaic) -> Float {
-        ((m as Float * self.width) + self.enc) * 
-            ((n as Float * self.height) + self.enc)
+        ((m as Float * self.width) + self.enc) * ((n as Float * self.height) + self.enc)
     }
 }
 
-#[derive (PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Cell {
     Core(Core),
     Logic(Logic),
     ADC(ADC),
-    Switch(Switch)
+    Switch(Switch),
 }
 
 impl Cell {
@@ -116,22 +139,22 @@ impl Cell {
     }
 }
 
-#[derive (Hash, Eq, PartialEq, Debug)]
+#[derive(Hash, Eq, PartialEq, Debug)]
 pub enum CellType {
     Core,
     Logic,
     ADC,
-    Switch
+    Switch,
 }
 
 impl fmt::Display for CellType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-       match self {
-           CellType::ADC => write!(f, "ADC"),
-           CellType::Core => write!(f, "Core"),
-           CellType::Logic => write!(f, "Logic"),
-           CellType::Switch => write!(f, "Switch")
-       }
+        match self {
+            CellType::ADC => write!(f, "ADC"),
+            CellType::Core => write!(f, "Core"),
+            CellType::Logic => write!(f, "Logic"),
+            CellType::Switch => write!(f, "Switch"),
+        }
     }
 }
 
@@ -140,19 +163,23 @@ pub trait Geometry {
     fn as_any(&self) -> &dyn Any;
 }
 
-#[derive (PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Core {
     pub dims: Dims,
     pub dx_wl: Float,
-    pub dx_bl: Float
+    pub dx_bl: Float,
 }
 
 impl Geometry for Core {
-    fn dims(&self) -> &Dims { &self.dims }
-    fn as_any(&self) -> &dyn Any { self }
+    fn dims(&self) -> &Dims {
+        &self.dims
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-#[derive (PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Logic {
     pub dims: Dims,
     pub dx: Float,
@@ -161,31 +188,43 @@ pub struct Logic {
 }
 
 impl Geometry for Logic {
-    fn dims(&self) -> &Dims { &self.dims }
-    fn as_any(&self) -> &dyn Any { self }
+    fn dims(&self) -> &Dims {
+        &self.dims
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-#[derive (PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Switch {
     pub dims: Dims,
     pub dx: Float,
-    pub voltage: Float
+    pub voltage: Float,
 }
 
 impl Geometry for Switch {
-    fn dims(&self) -> &Dims { &self.dims }
-    fn as_any(&self) -> &dyn Any { self }
+    fn dims(&self) -> &Dims {
+        &self.dims
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-#[derive (PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub struct ADC {
     pub dims: Dims,
     pub bits: usize,
-    pub fs: Float
+    pub fs: Float,
 }
 impl Geometry for ADC {
-    fn dims(&self) -> &Dims { &self.dims }
-    fn as_any(&self) -> &dyn Any { self }
+    fn dims(&self) -> &Dims {
+        &self.dims
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 /// Add a property to a given cell
@@ -193,73 +232,60 @@ impl Geometry for ADC {
 /// # Arguments
 /// * `cell` - Cell to update
 /// * `line` - Text line to read for adding properties
-///
-/// # Panics
-/// No property or value found on database line
-fn update_cell(cell: &mut Cell, line: &str) {
+fn update_cell(cell: &mut Cell, line: &str) -> Result<(), MemeaError> {
     let mut iter = line.split_whitespace();
-    let target = iter.next()
-        .expect(eliteral!("No property found on database line"))
-        .to_lowercase();
-    let value = iter.next()
-        .expect(eliteral!("No value found on database line"))
-        .to_lowercase();
+    let target = iter.next().ok_or(DBError::MissingProperty)?.to_lowercase();
+    let value = iter.next().ok_or(DBError::MissingValue)?.to_lowercase();
 
     match cell {
-        Cell::Core(core) => {
-            match target.as_str() {
-                "dx_wl" => { core.dx_wl = parse_float(&value) },
-                "dx_bl" => { core.dx_bl = parse_float(&value) },
-                "width" => { core.dims.width = parse_float(&value) },
-                "height" => { core.dims.height = parse_float(&value) },
-                "enc" => { core.dims.enc = parse_float(&value) },
-                _ => {},
-            }
+        Cell::Core(core) => match target.as_str() {
+            "dx_wl" => core.dx_wl = value.parse::<Float>()?,
+            "dx_bl" => core.dx_bl = value.parse::<Float>()?,
+            "width" => core.dims.width = value.parse::<Float>()?,
+            "height" => core.dims.height = value.parse::<Float>()?,
+            "enc" => core.dims.enc = value.parse::<Float>()?,
+            _ => {}
         },
-        Cell::Logic(logic) => {
-            match target.as_str() {
-                "dx" => { logic.dx = parse_float(&value) },
-                "bits" => { logic.bits = parse_usize(&value) },
-                "fs" => { logic.fs = parse_float(&value) },
-                "width" => { logic.dims.width = parse_float(&value) },
-                "height" => { logic.dims.height = parse_float(&value) },
-                "enc" => { logic.dims.enc = parse_float(&value) },
-                _ => {},
-            }
+        Cell::Logic(logic) => match target.as_str() {
+            "dx" => logic.dx = value.parse::<Float>()?,
+            "bits" => logic.bits = value.parse::<usize>()?,
+            "fs" => logic.fs = value.parse::<Float>()?,
+            "width" => logic.dims.width = value.parse::<Float>()?,
+            "height" => logic.dims.height = value.parse::<Float>()?,
+            "enc" => logic.dims.enc = value.parse::<Float>()?,
+            _ => {}
         },
-        Cell::Switch(switch) => {
-            match target.as_str() {
-                "dx" => { switch.dx = parse_float(&value) },
-                "voltage" => { switch.voltage = parse_float(&value) },
-                "width" => { switch.dims.width = parse_float(&value) },
-                "height" => { switch.dims.height = parse_float(&value) },
-                "enc" => { switch.dims.enc = parse_float(&value) },
-                _ => {},
-            }
+        Cell::Switch(switch) => match target.as_str() {
+            "dx" => switch.dx = value.parse::<Float>()?,
+            "voltage" => switch.voltage = value.parse::<Float>()?,
+            "width" => switch.dims.width = value.parse::<Float>()?,
+            "height" => switch.dims.height = value.parse::<Float>()?,
+            "enc" => switch.dims.enc = value.parse::<Float>()?,
+            _ => {}
         },
-        Cell::ADC(adc) => {
-            match target.as_str() {
-                "bits" => { adc.bits = parse_usize(&value) },
-                "fs" => { adc.fs = parse_float(&value) },
-                "width" => { adc.dims.width = parse_float(&value) },
-                "height" => { adc.dims.height = parse_float(&value) },
-                "enc" => { adc.dims.enc = parse_float(&value) },
-                _ => {},
-            }
-        }
+        Cell::ADC(adc) => match target.as_str() {
+            "bits" => adc.bits = value.parse::<usize>()?,
+            "fs" => adc.fs = value.parse::<Float>()?,
+            "width" => adc.dims.width = value.parse::<Float>()?,
+            "height" => adc.dims.height = value.parse::<Float>()?,
+            "enc" => adc.dims.enc = value.parse::<Float>()?,
+            _ => {}
+        },
     }
+
+    Ok(())
 }
 
 /// Builds a cell database from an input file
 ///
-/// # Arguments 
+/// # Arguments
 /// * `filename` - Path for the file to read
 ///
 /// # Panics
 /// Cannot decode line from file
 /// Could not parse cell type definition
 /// Invalid cell types
-pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, io::Error>{
+pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, MemeaError> {
     let file = fs::File::open(filename)?;
     let rdr = BufReader::new(file);
 
@@ -268,10 +294,12 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, io::Error>{
     let mut name = String::new();
 
     for line in rdr.lines() {
-        let line = line.expect(eliteral!("Could not decode line"));
+        let line = line?;
         let line = line.trim();
 
-        if line.starts_with('#') || (line.len() == 0) { continue; }
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
 
         // New cell
         if line.contains(':') {
@@ -280,41 +308,40 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, io::Error>{
                 db.update(&name, cell);
             }
 
-            let (kind, id) = line.split_once(':')
-                .expect(eliteral!("Could not parse cell type definition"));
+            let (kind, id) = line
+                .split_once(':')
+                .ok_or(DBError::InvalidCellDefinition(line.to_string()))?;
 
             let (kind, id) = (kind.trim(), id.trim());
 
             curr = match kind.to_lowercase().as_str() {
-                "core" => Some(Cell::Core( Core{
+                "core" => Some(Cell::Core(Core {
                     dims: Dims::new(),
                     dx_wl: 0.0,
                     dx_bl: 0.0,
                 })),
-                "logic" => Some(Cell::Logic( Logic{
+                "logic" => Some(Cell::Logic(Logic {
                     dims: Dims::new(),
                     dx: 0.0,
                     fs: 0.0,
                     bits: 0,
                 })),
-                "adc" => Some(Cell::ADC( ADC{
+                "adc" => Some(Cell::ADC(ADC {
                     dims: Dims::new(),
                     fs: 0.0,
-                    bits: 0
+                    bits: 0,
                 })),
-                "switch" => Some(Cell::Switch( Switch{
+                "switch" => Some(Cell::Switch(Switch {
                     dims: Dims::new(),
                     voltage: 0.0,
                     dx: 0.0,
                 })),
-                _ => { panic!(eliteral!("Invalid cell type")) }
+                _ => return Err(DBError::UnknownCellType(kind.to_string()).into()),
             };
 
             name = id.to_owned();
-        }
-
-        else if let Some(cell) = &mut curr {
-            update_cell(cell, line);
+        } else if let Some(cell) = &mut curr {
+            update_cell(cell, line)?;
         }
     }
 

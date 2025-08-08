@@ -3,7 +3,9 @@ pub mod export;
 pub mod primitives;
 pub mod tabulate;
 
-use crate::primitives::CellType;
+use crate::config::ConfigError;
+use crate::primitives::{CellType, DBError};
+use thiserror::Error;
 
 pub type Float = f32;
 pub type Mosaic = (usize, usize);
@@ -11,7 +13,11 @@ pub type Mosaic = (usize, usize);
 #[macro_export]
 macro_rules! eliteral {
     ($literal:expr) => {
-        concat!("\x1b[31mERROR: ", $literal, "\x1b[0m")
+        concat!(
+            "\\x1b[1;30;41mERROR (Unrecoverable): ",
+            $literal,
+            "\\x1b[0m"
+        )
     };
 }
 
@@ -43,6 +49,39 @@ macro_rules! infoln {
             $(, $args)*
         )
     };
+}
+
+#[derive(Debug, Error)]
+pub enum ValueError {
+    #[error("Expected a Value::Usize")]
+    NotUsize,
+    #[error("Expected a Value::Float")]
+    NotFloat,
+    #[error("Expected a Value::FloatVec")]
+    NotFloatVec,
+    #[error("Expected a Value::String")]
+    NotString,
+}
+
+#[derive(Debug, Error)]
+pub enum MemeaError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Parse int error: {0}")]
+    ParseInt(#[from] std::num::ParseIntError),
+
+    #[error("Parse float error: {0}")]
+    ParseFloat(#[from] std::num::ParseFloatError),
+
+    #[error("Config error: {0}")]
+    Config(#[from] ConfigError),
+
+    #[error("Value error: {0}")]
+    Value(#[from] ValueError),
+
+    #[error("Database error: {0}")]
+    Database(#[from] DBError),
 }
 
 fn get_scale(n: &usize) -> Option<Float> {
@@ -104,38 +143,38 @@ pub enum Value {
 
 #[allow(dead_code)]
 impl Value {
-    fn to_float(&self) -> Float {
+    fn to_float(&self) -> Result<Float, ValueError> {
         match self {
-            Value::Float(num) => *num,
-            _ => panic!(eliteral!("Expected a Value::Float")),
+            Value::Float(num) => Ok(*num),
+            _ => Err(ValueError::NotFloat),
         }
     }
 
-    fn to_usize(&self) -> usize {
+    fn to_usize(&self) -> Result<usize, ValueError> {
         match self {
-            Value::Usize(num) => *num,
-            _ => panic!(eliteral!("Expected a Value::Usize")),
+            Value::Usize(num) => Ok(*num),
+            _ => Err(ValueError::NotUsize),
         }
     }
 
-    fn as_vec(&self) -> &Vec<Float> {
+    fn as_vec(&self) -> Result<&Vec<Float>, ValueError> {
         match self {
-            Value::FloatVec(v) => v,
-            _ => panic!(eliteral!("Expected a Value::FloatVec")),
+            Value::FloatVec(v) => Ok(v),
+            _ => Err(ValueError::NotFloatVec),
         }
     }
 
-    fn as_str(&self) -> &str {
+    fn as_str(&self) -> Result<&str, ValueError> {
         match self {
-            Value::String(s) => s,
-            _ => panic!(eliteral!("Expected a Value::String")),
+            Value::String(s) => Ok(s),
+            _ => Err(ValueError::NotString),
         }
     }
 
-    fn to_string(&self) -> String {
+    fn to_string(&self) -> Result<String, ValueError> {
         match self {
-            Value::String(s) => s.to_owned(),
-            _ => panic!(eliteral!("Expected a Value::String")),
+            Value::String(s) => Ok(s.to_owned()),
+            _ => Err(ValueError::NotString),
         }
     }
 }
@@ -152,35 +191,23 @@ enum ValueTypes {
 /// # Arguments
 /// * `input` - Value to be decoded
 /// * `kind` - Data type of `input` constrained by `Target`
-///
-/// # Panics
-/// Incorrect `kind` for `input`
-fn decode(input: &str, kind: ValueTypes) -> Value {
+fn decode(input: &str, kind: ValueTypes) -> Result<Value, MemeaError> {
     match kind {
-        ValueTypes::Float => Value::Float(parse_float(input)),
-        ValueTypes::Usize => Value::Usize(parse_usize(input)),
-        ValueTypes::String => Value::String(input.to_owned()),
-        ValueTypes::FloatVec => Value::FloatVec(
-            input
+        ValueTypes::Float => {
+            let val = input.parse::<Float>()?;
+            Ok(Value::Float(val))
+        }
+        ValueTypes::Usize => {
+            let val = input.parse::<usize>()?;
+            Ok(Value::Usize(val))
+        }
+        ValueTypes::String => Ok(Value::String(input.to_owned())),
+        ValueTypes::FloatVec => {
+            let vals: Result<Vec<Float>, _> = input
                 .split(',')
-                .map(|x| {
-                    x.trim()
-                        .parse::<Float>()
-                        .expect(eliteral!("Could not parse float"))
-                })
-                .collect(),
-        ),
+                .map(|x| x.trim().parse::<Float>())
+                .collect();
+            Ok(Value::FloatVec(vals?)) // ? unwraps or returns Err
+        }
     }
-}
-
-fn parse_float(input: &str) -> Float {
-    input
-        .parse::<Float>()
-        .expect(eliteral!("Could not parse float"))
-}
-
-fn parse_usize(input: &str) -> usize {
-    input
-        .parse::<usize>()
-        .expect(eliteral!("Could not parse usize"))
 }

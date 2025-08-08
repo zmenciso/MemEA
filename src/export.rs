@@ -107,11 +107,10 @@ fn fmt_csv(input: &str, reports: &Reports) -> String {
 
 fn fmt_direct(input: &str, reports: &Reports) -> String {
     let mut content = format!(
-        "\nConfiguration: {}\n\
+        "\nConfiguration: {input}\n\
         Area breakdown:\n    \
         Name                 | Type     | Count    | Location | Area (μm²)\n    \
-        ---------------------|----------|----------|----------|------------\n",
-        input
+        ---------------------|----------|----------|----------|------------\n"
     );
 
     for report in reports.iter() {

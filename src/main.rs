@@ -1,5 +1,4 @@
 use clap::Parser;
-use std::error::Error;
 use std::path::PathBuf;
 
 use memea::config::Config;
@@ -31,11 +30,11 @@ pub struct Args {
     scale: Option<Float>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), MemeaError> {
     let args = Args::parse();
     let verbose = !args.quiet && !args.area_only;
 
-    if args.config.len() == 0 {
+    if args.config.is_empty() {
         eprintln!("No configuration files specified; aborting...");
         std::process::exit(255);
     }
@@ -71,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let reports: Vec<Reports> = configs
         .iter()
         .map(|c| tabulate::tabulate(c, &db, scale))
+        .filter_map(Result::ok)
         .collect();
 
     assert_eq!(configs.len(), reports.len());

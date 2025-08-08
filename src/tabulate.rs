@@ -1,8 +1,7 @@
-use std::process;
+use crate::primitives::*;
+use crate::MemeaError;
 
 use crate::config::Config;
-use crate::eliteral;
-use crate::primitives::*;
 use crate::{Float, Mosaic, Report, Reports};
 
 // Drive strength multipliers
@@ -15,7 +14,7 @@ fn locate(
     condition: impl Fn(&dyn Geometry) -> bool,
     cells: &CellList,
     mos: Mosaic,
-) -> (String, &dyn Geometry) {
+) -> Result<(String, &dyn Geometry), MemeaError> {
     let mut target = String::new();
     let mut sel: Option<&dyn Geometry> = None;
 
@@ -37,13 +36,10 @@ fn locate(
         }
     }
 
-    // TODO: Output which type of cell we failed to find
+    // TODO: Provide details on what we were trying to find
     match sel {
-        Some(x) => (target, x),
-        None => {
-            eprintln!("Failed to find suitable cell");
-            process::exit(4);
-        }
+        Some(x) => Ok((target, x)),
+        None => Err(DBError::NoSuitableCells.into()),
     }
 }
 
@@ -51,7 +47,7 @@ fn locate_type<T: 'static>(
     condition: impl Fn(&T) -> bool,
     cells: &CellList,
     mos: Mosaic,
-) -> (String, &T) {
+) -> Result<(String, &T), MemeaError> {
     let (name, cell) = locate(
         |cell: &dyn Geometry| {
             if let Some(typed) = cell.as_any().downcast_ref::<T>() {
@@ -62,16 +58,26 @@ fn locate_type<T: 'static>(
         },
         cells,
         mos,
-    );
+    )?;
 
-    (name, cell.as_any().downcast_ref::<T>().unwrap())
+    Ok((name, cell.as_any().downcast_ref::<T>().unwrap()))
 }
 
-fn locate_adc(fs: Float, bits: usize, adcs: &CellList, mos: Mosaic) -> (String, &ADC) {
+fn locate_adc(
+    fs: Float,
+    bits: usize,
+    adcs: &CellList,
+    mos: Mosaic,
+) -> Result<(String, &ADC), MemeaError> {
     locate_type(|adc: &ADC| adc.fs >= fs && adc.bits >= bits, adcs, mos)
 }
 
-fn locate_logic(dx: Float, bits: usize, logics: &CellList, mos: Mosaic) -> (String, &Logic) {
+fn locate_logic(
+    dx: Float,
+    bits: usize,
+    logics: &CellList,
+    mos: Mosaic,
+) -> Result<(String, &Logic), MemeaError> {
     locate_type(
         |logic: &Logic| logic.dx >= dx && logic.bits >= bits,
         logics,
@@ -79,7 +85,12 @@ fn locate_logic(dx: Float, bits: usize, logics: &CellList, mos: Mosaic) -> (Stri
     )
 }
 
-fn locate_switch(voltage: Float, dx: Float, switches: &CellList, mos: Mosaic) -> (String, &Switch) {
+fn locate_switch(
+    voltage: Float,
+    dx: Float,
+    switches: &CellList,
+    mos: Mosaic,
+) -> Result<(String, &Switch), MemeaError> {
     locate_type(
         |switch: &Switch| switch.dx >= dx && switch.voltage >= voltage,
         switches,
@@ -87,28 +98,26 @@ fn locate_switch(voltage: Float, dx: Float, switches: &CellList, mos: Mosaic) ->
     )
 }
 
-fn locate_core(config: &Config, core: &CellList) -> (String, Core) {
-    let name = config.retrieve("cell").to_string();
-    let cell = core
-        .get(&name)
-        .expect(eliteral!("Could not find target cell"));
+fn locate_core(config: &Config, core: &CellList) -> Result<(String, Core), MemeaError> {
+    let name = config.retrieve("cell")?.to_string()?;
+    let cell = core.get(&name).ok_or(DBError::MissingCell(name.clone()))?;
 
     match cell {
-        Cell::Core(x) => (name, *x),
-        _ => panic!(eliteral!("Core is not of type Cell::Core")),
+        Cell::Core(x) => Ok((name, *x)),
+        _ => Err(DBError::InvalidCellType(CellType::Core).into()),
     }
 }
 
 // TODO: scale as Option, only multiply if present
-pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
+pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, MemeaError> {
     let mut results: Reports = Vec::new();
 
-    let n = config.retrieve("n").to_usize();
-    let m = config.retrieve("m").to_usize();
+    let n = config.retrieve("n")?.to_usize()?;
+    let m = config.retrieve("m")?.to_usize()?;
 
     // Core area
     let mos = (n, m);
-    let (name, core) = locate_core(config, db.retrieve(CellType::Core));
+    let (name, core) = locate_core(config, db.retrieve(CellType::Core)?)?;
     let report = Report {
         name,
         count: n * m,
@@ -118,16 +127,16 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
     };
     results.push(report);
 
-    let switches = db.retrieve(CellType::Switch);
-    let logics = db.retrieve(CellType::Logic);
+    let switches = db.retrieve(CellType::Switch)?;
+    let logics = db.retrieve(CellType::Logic)?;
 
     // WL peripheral area
     let mos = (n, 1);
     if let Some(v) = config.get("wl") {
         let dx = n as Float * core.dx_wl;
 
-        for voltage in v.as_vec() {
-            let (target, switch) = locate_switch(*voltage, dx, switches, mos);
+        for voltage in v.as_vec()? {
+            let (target, switch) = locate_switch(*voltage, dx, switches, mos)?;
             let report = Report {
                 name: target,
                 count: n,
@@ -138,8 +147,8 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
             results.push(report);
         }
 
-        let bits = (v.as_vec().len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, mos);
+        let bits = (v.as_vec()?.len() as Float).log2().ceil() as usize;
+        let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, mos)?;
         let report = Report {
             name: target,
             count: n,
@@ -155,8 +164,8 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
     if let Some(v) = config.get("bl") {
         let dx = m as Float * core.dx_bl;
 
-        for voltage in v.as_vec() {
-            let (target, switch) = locate_switch(*voltage, dx, switches, mos);
+        for voltage in v.as_vec()? {
+            let (target, switch) = locate_switch(*voltage, dx, switches, mos)?;
             let report = Report {
                 name: target,
                 count: m,
@@ -167,8 +176,8 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
             results.push(report);
         }
 
-        let bits = (v.as_vec().len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, mos);
+        let bits = (v.as_vec()?.len() as Float).log2().ceil() as usize;
+        let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, mos)?;
         let report = Report {
             name: target,
             count: m,
@@ -184,8 +193,8 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
     if let Some(v) = config.get("well") {
         let dx = n as Float * ((core.dx_bl + core.dx_wl) / 2.0) * WELL_SCALE;
 
-        for voltage in v.as_vec() {
-            let (target, switch) = locate_switch(*voltage, dx, switches, mos);
+        for voltage in v.as_vec()? {
+            let (target, switch) = locate_switch(*voltage, dx, switches, mos)?;
             let report = Report {
                 name: target,
                 count: m,
@@ -196,8 +205,8 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
             results.push(report);
         }
 
-        let bits = (v.as_vec().len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, SINGLE);
+        let bits = (v.as_vec()?.len() as Float).log2().ceil() as usize;
+        let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, SINGLE)?;
         let report = Report {
             name: target,
             count: 1,
@@ -212,10 +221,10 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
     if let (Some(enob), Some(fs), Some(adcs)) =
         (config.get("enob"), config.get("fs"), config.get("adcs"))
     {
-        let (enob, fs, adcs) = (enob.to_usize(), fs.to_float(), adcs.to_usize());
+        let (enob, fs, adcs) = (enob.to_usize()?, fs.to_float()?, adcs.to_usize()?);
         let mos = (1, adcs);
 
-        let (target, adc) = locate_adc(fs, enob, db.retrieve(CellType::ADC), mos);
+        let (target, adc) = locate_adc(fs, enob, db.retrieve(CellType::ADC)?, mos)?;
         let report = Report {
             name: target,
             count: adcs,
@@ -229,5 +238,5 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Reports {
         eprintln!("WARNING: Missing ADC config info; ADCs will not be generated");
     }
 
-    results
+    Ok(results)
 }
