@@ -85,7 +85,7 @@ fn main() -> Result<(), MemeaError> {
         false => {
             let names: Vec<String> = configs.iter().map(|c| c.path.to_string()).collect();
 
-            export::export(names, &reports, &args.export);
+            export::export(names, &reports, &args.export)?;
         }
     }
 
