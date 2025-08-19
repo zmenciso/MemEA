@@ -1,4 +1,5 @@
-use crate::primitives::*;
+use crate::db::*;
+use crate::warnln;
 use crate::MemeaError;
 
 use crate::config::Config;
@@ -14,6 +15,7 @@ fn locate(
     condition: impl Fn(&dyn Geometry) -> bool,
     cells: &CellList,
     mos: Mosaic,
+    kind: CellType,
 ) -> Result<(String, &dyn Geometry), MemeaError> {
     let mut target = String::new();
     let mut sel: Option<&dyn Geometry> = None;
@@ -39,7 +41,7 @@ fn locate(
     // TODO: Provide details on what we were trying to find
     match sel {
         Some(x) => Ok((target, x)),
-        None => Err(DBError::NoSuitableCells.into()),
+        None => Err(DBError::NoSuitableCells(kind).into()),
     }
 }
 
@@ -47,6 +49,7 @@ fn locate_type<T: 'static>(
     condition: impl Fn(&T) -> bool,
     cells: &CellList,
     mos: Mosaic,
+    kind: CellType,
 ) -> Result<(String, &T), MemeaError> {
     let (name, cell) = locate(
         |cell: &dyn Geometry| {
@@ -58,6 +61,7 @@ fn locate_type<T: 'static>(
         },
         cells,
         mos,
+        kind,
     )?;
 
     Ok((name, cell.as_any().downcast_ref::<T>().unwrap()))
@@ -69,7 +73,12 @@ fn locate_adc(
     adcs: &CellList,
     mos: Mosaic,
 ) -> Result<(String, &ADC), MemeaError> {
-    locate_type(|adc: &ADC| adc.fs >= fs && adc.bits >= bits, adcs, mos)
+    locate_type(
+        |adc: &ADC| adc.fs >= fs && adc.bits >= bits,
+        adcs,
+        mos,
+        CellType::ADC,
+    )
 }
 
 fn locate_logic(
@@ -82,6 +91,7 @@ fn locate_logic(
         |logic: &Logic| logic.dx >= dx && logic.bits >= bits,
         logics,
         mos,
+        CellType::Logic,
     )
 }
 
@@ -92,9 +102,12 @@ fn locate_switch(
     mos: Mosaic,
 ) -> Result<(String, &Switch), MemeaError> {
     locate_type(
-        |switch: &Switch| switch.dx >= dx && switch.voltage >= voltage,
+        |switch: &Switch| {
+            switch.dx >= dx && voltage >= switch.voltage.min && voltage <= switch.voltage.max
+        },
         switches,
         mos,
+        CellType::Switch,
     )
 }
 
@@ -157,6 +170,11 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
             area: logic.dims.area(mos) * scale,
         };
         results.push(report);
+    } else {
+        warnln!(
+            "No 'wl' key supplied, skipping wordline drivers for config {:?}",
+            config.path
+        )
     }
 
     // BL peripheral area
@@ -186,6 +204,11 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
             area: logic.dims.area(mos) * scale,
         };
         results.push(report);
+    } else {
+        warnln!(
+            "No 'bl' key supplied, skipping bitline drivers for config {:?}",
+            config.path
+        )
     }
 
     // Well peripheral area
@@ -215,6 +238,11 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
             area: logic.dims.area(SINGLE) * scale,
         };
         results.push(report);
+    } else {
+        warnln!(
+            "No 'well' key supplied, skipping well drivers for config {}",
+            config.path
+        )
     }
 
     // ADC area
@@ -235,7 +263,7 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
 
         results.push(report);
     } else {
-        eprintln!("WARNING: Missing ADC config info; ADCs will not be generated");
+        warnln!("Missing ADC config info (expecting 'enob', 'fs', and 'adcs'); ADCs will not be generated");
     }
 
     Ok(results)
