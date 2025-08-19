@@ -18,8 +18,8 @@ The output executable will be `target/release/memea`.
 
 MemEA requires two inputs: **1)** a configuration file that describes the memory
 array and **2)** a database of cells and peripheral circuits.  Both are written
-in simple plain text files as key/value pairs.  Empty lines and lines  starting
-with `#` are ignored.
+in simple plain text files as key/value pairs.  Empty lines and lines starting
+with `#` are always ignored.
 
 MemEA also accepts multiple configuration files, which will be compared
 against each other after running.
@@ -48,8 +48,8 @@ A full list of options is provided below:
 |--------|------|-------------|---------|
 | `n` | `int` | Number of rows | `64` |
 | `m` | `int` | Number of columns | `64` |
-| `bl` | `array[float]` | Required bitline voltages.  A voltage of -1 V indicates a high-Z mode. | `1, 2, 0, -1` |
-| `wl` | `array[float]` | Required wordline voltages.  A voltage of -1 V indicates a high-Z mode. | `4, 2.5, 0` |
+| `bl` | `array[float]` | Required bitline voltages. | `1, 2, 0, -1` |
+| `wl` | `array[float]` | Required wordline voltages. | `4, 2.5, 0` |
 | `well` | `array[float]` | Required well voltages (to bias a row-wise, column-wise or full-array deep n-well). | `0, 4` |
 | `cell` | `string` | Which in the database to use as the memory cell. | `2FeFET_TCAM_100` |
 | `enob` | `int` | Minimum ENOB for downstream ADCs (also supports sense-amplifiers and other single-bit data conversion) | `1` |
@@ -71,8 +71,8 @@ An example configuration is also available: `./config/example.txt`.
 
 The database has four types of circuits: `core`, `logic`, `switch`, and `adc`.
 Describing a circuit begins with the type and name of the circuit, separated by
-`:`. Subsequent lines describe the properties of the circuit, separated by
-whitespace.  For example:
+`:` or `=`. Subsequent lines describe the properties of the circuit, separated
+by whitespace, `:`, or `=`.  For example:
 
 ```
 switch: TXGD16
@@ -127,7 +127,7 @@ logic.
 
 | Option | Type | Description | Example |
 |--------|------|-------------|---------|
-| `voltage` | `float` | Maximum voltage the switch can drive before oxide breakdown | `2.5` |
+| `voltage` | `floatTuple`[^1] | Maximum voltage the switch can drive before oxide breakdown | `(0.8, 1.3)` |
 | `dx` | `float` | Relative drive strength of the switch | `16` |
 
 #### `adc`
@@ -154,7 +154,7 @@ set OUTPUT_DIR cim_sweep
 set N 16 32 64 128 256
 set M 16 32 64 128 256
 
-set BL '1, 2, 0, -1'
+set BL '1, 2, 0'
 set WL '4, 2.5, 0, 1'
 set WELL '0, 4'
 set CELL 1FeFET_100
@@ -178,7 +178,6 @@ fish size_sweep.fish
 ### New Features
 
 - Interactive/automatic database builder from GDS
-- Support for driving negative voltages
 - Combine like elements in area breakdown (i.e. only report unique
     occurrences)
 - Produce example/estimated floorplan for each configuration
@@ -195,3 +194,6 @@ fish size_sweep.fish
 ### Performance
 
 - Reduce the number of times file descriptors are opened and closed
+
+[^1]: `floatTuple` can be enclosed in parenthesis (`(`) or braces (`[`), and the
+    values may be delimited with `,`, `;`, or whitespace.
