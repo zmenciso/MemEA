@@ -1,10 +1,9 @@
-
 use clap::Parser;
-use std::error::Error;
 use std::path::PathBuf;
+use std::time::Instant;
 
-use memea::*;
 use memea::config::Config;
+use memea::*;
 
 const DEFAULT_DB: &str = "./data/db.txt";
 
@@ -24,44 +23,94 @@ pub struct Args {
 
     #[arg(short, long)]
     quiet: bool,
+
+    #[arg(long, value_names = ["FROM", "TO"], num_args = 2)]
+    autoscale: Option<Vec<usize>>,
+
+    #[arg(long)]
+    scale: Option<Float>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), MemeaError> {
     let args = Args::parse();
     let verbose = !args.quiet && !args.area_only;
 
-    if args.config.len() == 0 {
-        eprintln!("No configuration files specified; aborting...");
+    if args.config.is_empty() {
+        errorln!("No configuration files specified; aborting...");
         std::process::exit(255);
     }
 
-    if verbose { println!("Building database..."); }
-    let db = primitives::build_db(&args.db)?;
+    let start = Instant::now();
+    let db = db::build_db(&args.db)?;
 
-    if verbose { println!("Reading configuration files..."); }
-    let configs: Vec<Config> = args.config.iter()
-        .map(|p| config::read(p).expect("Could not read configuration file"))
-        .collect();
+    if verbose {
+        infoln!("Built database in {:?}", start.elapsed());
+    }
+    let start = Instant::now();
 
-    if verbose { println!("Building solution..."); }
-    let reports: Vec<Reports> = configs.iter()
-        .map(|c| tabulate::tabulate(c, &db))
-        .collect();
+    let mut configs: Vec<Config> = Vec::new();
+    for c in args.config {
+        match config::read(&c) {
+            Ok(r) => configs.push(r),
+            Err(e) => errorln!("Failed to read config {:?} ({})", &c, e),
+        }
+    }
 
-    assert_eq!(configs.len(), reports.len());
+    let scale: Float = match args.scale {
+        Some(val) => val,
+        None => match args.autoscale {
+            Some(vals) => {
+                let (from, to) = (vals[0], vals[1]);
+                scale(from, to)
+            }
+            _ => 1.0,
+        },
+    };
+
+    if verbose {
+        infoln!(
+            "Read {} configuration files in {:?}",
+            configs.len(),
+            start.elapsed()
+        );
+    }
+    let start = Instant::now();
+
+    let mut reports: Vec<Reports> = Vec::new();
+    for c in &configs {
+        match tabulate::tabulate(c, &db, scale) {
+            Ok(r) => reports.push(r),
+            Err(e) => errorln!("Failed to tabulate config: {}", e),
+        }
+    }
+
+    if configs.len() != reports.len() {
+        warnln!(
+            "Number of reports ({}) does not match number of configs ({})",
+            reports.len(),
+            configs.len()
+        );
+    }
+
+    if verbose {
+        infoln!(
+            "Built {}/{} solution(s) in {:?}",
+            reports.len(),
+            configs.len(),
+            start.elapsed()
+        );
+    }
 
     match args.area_only {
         true => {
-            for i in 0 .. reports.len() {
+            for i in 0..reports.len() {
                 println!("{}\t{}", &configs[i].path, export::area(&reports[i]));
             }
         }
         false => {
-            let names: Vec<String> = configs.iter()
-                .map(|c| c.path.to_string())
-                .collect();
+            let names: Vec<String> = configs.iter().map(|c| c.path.to_string()).collect();
 
-            export::export(names, &reports, &args.export);
+            export::export(names, &reports, &args.export)?;
         }
     }
 

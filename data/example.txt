@@ -4,25 +4,32 @@
 # Include level shifters for thick oxide FETs
 # Include well biasing contacts
 switch: TXGD16
-	voltage 1.3
+	voltage 0, 1.3
 	dx 16
 	width 1.156
 	height 0.995
 	enc 0.490
 
 switch: TXGD16_25
-	voltage 2.8
+	voltage 0, 2.8
 	dx 16
 	width 2.105
 	height 1.380
 	enc 0.980
 
 switch: TXGD16_33
-	voltage 4
+	voltage 0, 4
 	dx 16
 	width 2.105
 	height 1.380
 	enc 0.980
+
+switch: PSWD16
+    voltage 0.8, 1.3
+    dx 16
+    width 1.156
+    height 0.460
+    enc 0.490
 
 ################################################################################
 #                                    LOGIC                                     #
