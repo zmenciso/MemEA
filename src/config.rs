@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::Path;
 use thiserror::Error;
 
 use crate::decode;
@@ -22,7 +22,7 @@ pub struct Config {
 
 impl Config {
     /// Create new Config from file path
-    fn new(name: &PathBuf) -> Config {
+    fn new(name: &Path) -> Config {
         Config {
             config: HashMap::new(),
             path: name.to_string_lossy().into_owned(),
@@ -89,7 +89,7 @@ pub fn read(filename: &std::path::PathBuf) -> Result<Config, MemeaError> {
             continue;
         }
 
-        if let Some((param, value)) = line.split_once(':') {
+        if let Some((param, value)) = line.split_once([':', '=']) {
             config.update(param.trim(), value.trim())?;
         } else {
             warnln!("Delimeter not found in string: {}", line);
