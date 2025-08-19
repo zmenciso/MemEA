@@ -18,33 +18,43 @@ macro_rules! eliteral {
 }
 
 #[macro_export]
-macro_rules! errorln {
-    ($literal:literal $(, $args:expr)* $(,)?) => {
-        eprintln!(
-            concat!("\x1b[31mERROR: ", $literal, "\x1b[0m")
+macro_rules! __log_internal {
+    ($print:ident, $color:literal, $label:literal, $literal:literal $(, $args:expr)* $(,)?) => {
+        $print!(
+            concat!("\x1b[", $color, "m", $label, ": ", $literal, "\x1b[0m")
             $(, $args)*
         )
     };
 }
 
+// INFO
 #[macro_export]
-macro_rules! warnln {
-    ($literal:literal $(, $args:expr)* $(,)?) => {
-        eprintln!(
-            concat!("\x1b[33mWARNING: ", $literal, "\x1b[0m")
-            $(, $args)*
-        )
-    };
+macro_rules! info {
+    ($($tt:tt)*) => { $crate::__log_internal!(eprint, "32", "INFO", $($tt)*) }
 }
-
 #[macro_export]
 macro_rules! infoln {
-    ($literal:literal $(, $args:expr)* $(,)?) => {
-        eprintln!(
-            concat!("\x1b[32mINFO: ", $literal, "\x1b[0m")
-            $(, $args)*
-        )
-    };
+    ($($tt:tt)*) => { $crate::__log_internal!(eprintln, "32", "INFO", $($tt)*) }
+}
+
+// WARN
+#[macro_export]
+macro_rules! warn {
+    ($($tt:tt)*) => { $crate::__log_internal!(eprint, "33", "WARNING", $($tt)*) }
+}
+#[macro_export]
+macro_rules! warnln {
+    ($($tt:tt)*) => { $crate::__log_internal!(eprintln, "33", "WARNING", $($tt)*) }
+}
+
+// ERROR
+#[macro_export]
+macro_rules! error {
+    ($($tt:tt)*) => { $crate::__log_internal!(eprint, "31", "ERROR", $($tt)*) }
+}
+#[macro_export]
+macro_rules! errorln {
+    ($($tt:tt)*) => { $crate::__log_internal!(eprintln, "31", "ERROR", $($tt)*) }
 }
 
 #[derive(Debug, Error)]
@@ -129,6 +139,12 @@ pub struct Report {
 
 pub type Reports = Vec<Report>;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Range {
+    pub min: Float,
+    pub max: Float,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Value {
     Float(Float),
@@ -200,7 +216,8 @@ fn decode(input: &str, kind: ValueTypes) -> Result<Value, MemeaError> {
         ValueTypes::String => Ok(Value::String(input.to_owned())),
         ValueTypes::FloatVec => {
             let vals: Result<Vec<Float>, _> = input
-                .split(',')
+                .split(|c: char| c == ',' || c == ';' || c.is_whitespace())
+                .filter(|s| !s.trim().is_empty())
                 .map(|x| x.trim().parse::<Float>())
                 .collect();
             Ok(Value::FloatVec(vals?)) // ? unwraps or returns Err
