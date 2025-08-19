@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use memea::config::Config;
 use memea::*;
@@ -35,24 +36,25 @@ fn main() -> Result<(), MemeaError> {
     let verbose = !args.quiet && !args.area_only;
 
     if args.config.is_empty() {
-        eprintln!("No configuration files specified; aborting...");
+        errorln!("No configuration files specified; aborting...");
         std::process::exit(255);
     }
 
-    if verbose {
-        infoln!("Building database...");
-    }
+    let start = Instant::now();
     let db = primitives::build_db(&args.db)?;
 
     if verbose {
-        infoln!("Reading configuration files...");
+        infoln!("Built database in {:?}", start.elapsed());
     }
-    let configs: Vec<Config> = args
-        .config
-        .iter()
-        .map(|p| config::read(p))
-        .filter_map(Result::ok)
-        .collect();
+    let start = Instant::now();
+
+    let mut configs: Vec<Config> = Vec::new();
+    for c in args.config {
+        match config::read(&c) {
+            Ok(r) => configs.push(r),
+            Err(e) => errorln!("Failed to read config {:?} ({})", &c, e),
+        }
+    }
 
     let scale: Float = match args.scale {
         Some(val) => val,
@@ -66,20 +68,43 @@ fn main() -> Result<(), MemeaError> {
     };
 
     if verbose {
-        infoln!("Building solution...");
+        infoln!(
+            "Read {} configuration files in {:?}",
+            configs.len(),
+            start.elapsed()
+        );
     }
-    let reports: Vec<Reports> = configs
-        .iter()
-        .map(|c| tabulate::tabulate(c, &db, scale))
-        .filter_map(Result::ok)
-        .collect();
+    let start = Instant::now();
 
-    assert_eq!(configs.len(), reports.len());
+    let mut reports: Vec<Reports> = Vec::new();
+    for c in &configs {
+        match tabulate::tabulate(c, &db, scale) {
+            Ok(r) => reports.push(r),
+            Err(e) => errorln!("Failed to tabulate config: {}", e),
+        }
+    }
+
+    if configs.len() != reports.len() {
+        warnln!(
+            "Number of reports ({}) does not match number of configs ({})",
+            reports.len(),
+            configs.len()
+        );
+    }
+
+    if verbose {
+        infoln!(
+            "Built {}/{} solution(s) in {:?}",
+            reports.len(),
+            configs.len(),
+            start.elapsed()
+        );
+    }
 
     match args.area_only {
         true => {
             for i in 0..reports.len() {
-                infoln!("{}\t{}", &configs[i].path, export::area(&reports[i]));
+                println!("{}\t{}", &configs[i].path, export::area(&reports[i]));
             }
         }
         false => {
