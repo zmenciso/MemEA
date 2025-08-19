@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader};
 use thiserror::Error;
 
 use crate::MemeaError;
-use crate::{Float, Mosaic};
+use crate::{Float, Mosaic, Range};
 
 pub type CellList = HashMap<String, Cell>;
 
@@ -27,19 +27,25 @@ pub enum DBError {
     #[error("Malformed cell type definition line: {0}")]
     InvalidCellDefinition(String),
 
-    #[error("Missing cell property on database line")]
-    MissingProperty,
+    #[error("Malformed property line: {0}")]
+    InvalidCellProperty(String),
 
-    #[error("Missing cell value on database line")]
-    MissingValue,
+    #[error("Failed to find suitable cell {0} in database")]
+    NoSuitableCells(CellType),
 
-    #[error("Failed to find suitable cell in database")]
-    NoSuitableCells,
+    #[error("Value does not contain two floats: {0}")]
+    TupleParseError(String),
 }
 
 #[derive(Debug)]
 pub struct DB {
     cells: HashMap<CellType, CellList>,
+}
+
+impl Default for DB {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DB {
@@ -103,6 +109,12 @@ pub struct Dims {
     enc: Float,
 }
 
+impl Default for Dims {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dims {
     pub fn new() -> Dims {
         Dims {
@@ -143,6 +155,8 @@ pub enum CellType {
     ADC,
     Switch,
 }
+
+pub const CELLS: [&str; 4] = ["core", "logic", "adc", "switch"];
 
 impl fmt::Display for CellType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -197,7 +211,7 @@ impl Geometry for Logic {
 pub struct Switch {
     pub dims: Dims,
     pub dx: Float,
-    pub voltage: Float,
+    pub voltage: Range,
 }
 
 impl Geometry for Switch {
@@ -224,15 +238,32 @@ impl Geometry for ADC {
     }
 }
 
+pub fn parse_range(line: &str) -> Result<Range, MemeaError> {
+    let (min, max) = line
+        .trim()
+        .trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != ',' && c != ';' && c != '-')
+        .split_once(|c: char| c == ',' || c == ';' || c.is_whitespace())
+        .ok_or(DBError::TupleParseError(line.to_string()))?;
+
+    let min: Float = min.trim().parse::<Float>()?;
+    let max: Float = max.trim().parse::<Float>()?;
+
+    Ok(Range { min, max })
+}
+
 /// Add a property to a given cell
 ///
 /// # Arguments
 /// * `cell` - Cell to update
 /// * `line` - Text line to read for adding properties
 fn update_cell(cell: &mut Cell, line: &str) -> Result<(), MemeaError> {
-    let mut iter = line.split_whitespace();
-    let target = iter.next().ok_or(DBError::MissingProperty)?.to_lowercase();
-    let value = iter.next().ok_or(DBError::MissingValue)?.to_lowercase();
+    let (target, value) = line
+        .trim()
+        .split_once(|c: char| c == ':' || c == '=' || c.is_whitespace())
+        .ok_or(DBError::InvalidCellProperty(line.to_string()))?;
+
+    let target = target.trim().to_lowercase();
+    let value = value.trim();
 
     match cell {
         Cell::Core(core) => match target.as_str() {
@@ -254,7 +285,7 @@ fn update_cell(cell: &mut Cell, line: &str) -> Result<(), MemeaError> {
         },
         Cell::Switch(switch) => match target.as_str() {
             "dx" => switch.dx = value.parse::<Float>()?,
-            "voltage" => switch.voltage = value.parse::<Float>()?,
+            "voltage" => switch.voltage = parse_range(value)?,
             "width" => switch.dims.width = value.parse::<Float>()?,
             "height" => switch.dims.height = value.parse::<Float>()?,
             "enc" => switch.dims.enc = value.parse::<Float>()?,
@@ -294,14 +325,14 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, MemeaError> {
         }
 
         // New cell
-        if line.contains(':') {
+        if CELLS.iter().any(|&t| line.to_lowercase().contains(t)) {
             // Push previous cell
             if let Some(cell) = curr.take() {
                 db.update(&name, cell);
             }
 
             let (kind, id) = line
-                .split_once(':')
+                .split_once(|c: char| c == ':' || c == '=' || c.is_whitespace())
                 .ok_or(DBError::InvalidCellDefinition(line.to_string()))?;
 
             let (kind, id) = (kind.trim(), id.trim());
@@ -325,7 +356,7 @@ pub fn build_db(filename: &std::path::PathBuf) -> Result<DB, MemeaError> {
                 })),
                 "switch" => Some(Cell::Switch(Switch {
                     dims: Dims::new(),
-                    voltage: 0.0,
+                    voltage: Range { min: 0.0, max: 0.0 },
                     dx: 0.0,
                 })),
                 _ => return Err(DBError::UnknownCellType(kind.to_string()).into()),
