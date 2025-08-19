@@ -1,10 +1,10 @@
 pub mod config;
+pub mod db;
 pub mod export;
-pub mod primitives;
 pub mod tabulate;
 
 use crate::config::ConfigError;
-use crate::primitives::{CellType, DBError};
+use crate::db::{CellType, DBError};
 use thiserror::Error;
 
 pub type Float = f32;

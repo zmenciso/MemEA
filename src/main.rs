@@ -41,7 +41,7 @@ fn main() -> Result<(), MemeaError> {
     }
 
     let start = Instant::now();
-    let db = primitives::build_db(&args.db)?;
+    let db = db::build_db(&args.db)?;
 
     if verbose {
         infoln!("Built database in {:?}", start.elapsed());
