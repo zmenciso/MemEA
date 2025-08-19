@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
 
-use crate::{infoln, warnln, Float, MemeaError, Reports};
+use crate::{infoln, warn, Float, MemeaError, Reports};
 
 /// Write string content to buffer
 ///
@@ -31,14 +31,14 @@ pub fn area(reports: &Reports) -> Float {
 /// * `filename` - Path of the output file to write.  If None, writes to stdout
 pub fn export(
     inputs: Vec<String>,
-    reports: &Vec<Reports>,
+    reports: &[Reports],
     filename: &Option<PathBuf>,
 ) -> Result<(), MemeaError> {
     let buf = match filename {
         Some(x) => {
             if metadata(x).is_ok() {
-                warnln!(
-                    "'{}' already exists.  Overwrite? (Y/n)",
+                warn!(
+                    "'{}' already exists.  Overwrite? (Y/n) ",
                     x.to_string_lossy()
                 );
 
