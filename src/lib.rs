@@ -1,14 +1,38 @@
 pub mod config;
 pub mod db;
 pub mod export;
+pub mod gds;
 pub mod tabulate;
+
+use std::io;
 
 use crate::config::ConfigError;
 use crate::db::{CellType, DBError};
+use std::fmt::Write;
+use terminal_size::{terminal_size, Width};
 use thiserror::Error;
 
 pub type Float = f32;
 pub type Mosaic = (usize, usize);
+
+pub const LOGO: &str = r#"
+    __  ___               _________ 
+   /  |/  /__  ____ ___  / ____/   |
+  / /|_/ / _ \/ __ `__ \/ __/ / /| |
+ / /  / /  __/ / / / / / /___/ ___ |
+/_/  /_/\___/_/ /_/ /_/_____/_/  |_|
+
+"#;
+
+// Verbose printing
+#[macro_export]
+macro_rules! vprintln {
+    ($verbose:expr, $($arg:tt)*) => {
+        if $verbose {
+            println!($($arg)*);
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! eliteral {
@@ -71,23 +95,94 @@ pub enum ValueError {
 
 #[derive(Debug, Error)]
 pub enum MemeaError {
+    #[error("GDS error: {0}")]
+    Gds(#[from] gds21::GdsError),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-
     #[error("Parse int error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
-
     #[error("Parse float error: {0}")]
     ParseFloat(#[from] std::num::ParseFloatError),
-
     #[error("Config error: {0}")]
     Config(#[from] ConfigError),
-
     #[error("Value error: {0}")]
     Value(#[from] ValueError),
-
     #[error("Database error: {0}")]
     Database(#[from] DBError),
+}
+
+pub enum QueryDefault {
+    Yes,
+    No,
+    Neither,
+}
+
+pub fn query(prompt: &str, warn: bool, default: QueryDefault) -> Result<bool, MemeaError> {
+    let query: &str = match default {
+        QueryDefault::No => " (y/N) ",
+        QueryDefault::Yes => " (Y/n) ",
+        QueryDefault::Neither => " (y/n) ",
+    };
+
+    match warn {
+        true => warn!("{} {}", prompt, query),
+        false => print!("{prompt} {query}"),
+    }
+
+    let mut input = String::new();
+
+    loop {
+        io::stdin().read_line(&mut input)?;
+        input = input.trim().to_lowercase();
+
+        if input.is_empty() {
+            return match default {
+                QueryDefault::Neither => continue,
+                QueryDefault::No => Ok(false),
+                QueryDefault::Yes => Ok(true),
+            };
+        }
+
+        match input.as_str() {
+            "y" | "ye" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => continue,
+        }
+    }
+}
+
+pub fn bar(header: Option<&str>, ch: char) -> String {
+    let width = if let Some((Width(w), _)) = terminal_size() {
+        w as usize
+    } else {
+        80
+    };
+
+    let mut output = String::new();
+
+    if let Some(text) = header {
+        writeln!(output, "{}", ch.to_string().repeat(width)).ok();
+
+        let text_len = text.chars().count();
+        let padding = width.saturating_sub(text_len + 2);
+        let left_pad = padding / 2;
+
+        writeln!(
+            output,
+            "{}{}{}{}{}",
+            ch,
+            " ".repeat(left_pad),
+            text,
+            " ".repeat(padding - left_pad),
+            ch
+        )
+        .ok();
+    }
+
+    writeln!(output, "{}", ch.to_string().repeat(width)).ok();
+    writeln!(output).ok();
+
+    output
 }
 
 fn get_scale(n: &usize) -> Option<Float> {
