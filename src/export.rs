@@ -1,9 +1,9 @@
 use std::fs::{metadata, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process;
+use std::str;
 
-use crate::{infoln, warn, Float, MemeaError, Reports};
+use crate::{infoln, query, Float, MemeaError, Reports};
 
 /// Write string content to buffer
 ///
@@ -37,17 +37,14 @@ pub fn export(
     let buf = match filename {
         Some(x) => {
             if metadata(x).is_ok() {
-                warn!(
-                    "'{}' already exists.  Overwrite? (Y/n) ",
-                    x.to_string_lossy()
-                );
-
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
-
-                if input.trim().to_lowercase() == "n" {
+                let allow = query(
+                    format!("'{}' already exists. Overwrite?", x.to_string_lossy()).as_str(),
+                    true,
+                    crate::QueryDefault::Yes,
+                )?;
+                if !allow {
                     infoln!("Aborting...");
-                    process::exit(147);
+                    return Ok(());
                 }
             }
 
