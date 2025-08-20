@@ -14,25 +14,18 @@ pub type CellList = HashMap<String, Cell>;
 pub enum DBError {
     #[error("Cannot find database, or it is invalid: {0}")]
     InvalidDatabase(CellType),
-
     #[error("Cell is not of type {0}")]
     InvalidCellType(CellType),
-
     #[error("Unknown cell type: {0}")]
     UnknownCellType(String),
-
     #[error("Cannot find cell in database: {0}")]
     MissingCell(String),
-
     #[error("Malformed cell type definition line: {0}")]
     InvalidCellDefinition(String),
-
     #[error("Malformed property line: {0}")]
     InvalidCellProperty(String),
-
     #[error("Failed to find suitable cell {0} in database")]
     NoSuitableCells(CellType),
-
     #[error("Value does not contain two floats: {0}")]
     TupleParseError(String),
 }
