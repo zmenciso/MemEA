@@ -10,7 +10,8 @@ const DEFAULT_DB: &str = "./data/db.txt";
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct Args {
-    config: Vec<PathBuf>,
+    #[arg(required = true)]
+    input: Vec<PathBuf>,
 
     #[arg(short, long, default_value = DEFAULT_DB)]
     db: PathBuf,
@@ -29,27 +30,42 @@ pub struct Args {
 
     #[arg(long)]
     scale: Option<Float>,
+
+    #[arg(long)]
+    gds: bool,
+
+    #[arg(long)]
+    gds_layer: Option<i16>,
+
+    #[arg(short, long)]
+    interactive: bool,
 }
 
 fn main() -> Result<(), MemeaError> {
     let args = Args::parse();
     let verbose = !args.quiet && !args.area_only;
 
-    if args.config.is_empty() {
-        errorln!("No configuration files specified; aborting...");
-        std::process::exit(255);
+    if args.gds {
+        println!("{LOGO}");
+        println!("{}", bar(Some("Interactive GDS Import"), '#'));
+
+        gds::read(&args.input[0].to_string_lossy(), args.gds_layer)?;
+
+        return Ok(());
+    }
+
+    if args.interactive {
+        // TODO: Interactive
     }
 
     let start = Instant::now();
     let db = db::build_db(&args.db)?;
 
-    if verbose {
-        infoln!("Built database in {:?}", start.elapsed());
-    }
+    vprintln!(verbose, "Built database in {:?}", start.elapsed());
     let start = Instant::now();
 
     let mut configs: Vec<Config> = Vec::new();
-    for c in args.config {
+    for c in args.input {
         match config::read(&c) {
             Ok(r) => configs.push(r),
             Err(e) => errorln!("Failed to read config {:?} ({})", &c, e),
@@ -67,13 +83,12 @@ fn main() -> Result<(), MemeaError> {
         },
     };
 
-    if verbose {
-        infoln!(
-            "Read {} configuration files in {:?}",
-            configs.len(),
-            start.elapsed()
-        );
-    }
+    vprintln!(
+        verbose,
+        "Read {} configuration file(s) in {:?}",
+        configs.len(),
+        start.elapsed()
+    );
     let start = Instant::now();
 
     let mut reports: Vec<Reports> = Vec::new();
@@ -92,14 +107,13 @@ fn main() -> Result<(), MemeaError> {
         );
     }
 
-    if verbose {
-        infoln!(
-            "Built {}/{} solution(s) in {:?}",
-            reports.len(),
-            configs.len(),
-            start.elapsed()
-        );
-    }
+    vprintln!(
+        verbose,
+        "Built {}/{} solution(s) in {:?}",
+        reports.len(),
+        configs.len(),
+        start.elapsed()
+    );
 
     match args.area_only {
         true => {
