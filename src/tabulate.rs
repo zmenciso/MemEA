@@ -112,28 +112,25 @@ fn locate_switch(
 }
 
 fn locate_core(config: &Config, core: &CellList) -> Result<(String, Core), MemeaError> {
-    let name = config.retrieve("cell")?.to_string()?;
-    let cell = core.get(&name).ok_or(DBError::MissingCell(name.clone()))?;
+    let name = &config.cell;
+    let cell = core.get(name).ok_or(DBError::MissingCell(name.clone()))?;
 
     match cell {
-        Cell::Core(x) => Ok((name, *x)),
+        Cell::Core(x) => Ok((name.to_string(), *x)),
         _ => Err(DBError::InvalidCellType(CellType::Core).into()),
     }
 }
 
 // TODO: scale as Option, only multiply if present
-pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, MemeaError> {
+pub fn tabulate(id: &str, config: &Config, db: &DB, scale: Float) -> Result<Reports, MemeaError> {
     let mut results: Reports = Vec::new();
 
-    let n = config.retrieve("n")?.to_usize()?;
-    let m = config.retrieve("m")?.to_usize()?;
-
     // Core area
-    let mos = (n, m);
+    let mos = (config.n, config.m);
     let (name, core) = locate_core(config, db.retrieve(CellType::Core)?)?;
     let report = Report {
         name,
-        count: n * m,
+        count: config.n * config.m,
         kind: CellType::Core,
         loc: String::from("Array"),
         area: core.dims.area(mos) * scale,
@@ -144,15 +141,15 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
     let logics = db.retrieve(CellType::Logic)?;
 
     // WL peripheral area
-    let mos = (n, 1);
-    if let Some(v) = config.get("wl") {
-        let dx = n as Float * core.dx_wl;
+    let mos = (config.n, 1);
+    if let Some(v) = &config.wl {
+        let dx = config.n as Float * core.dx_wl;
 
-        for voltage in v.as_vec()? {
+        for voltage in v {
             let (target, switch) = locate_switch(*voltage, dx, switches, mos)?;
             let report = Report {
                 name: target,
-                count: n,
+                count: config.n,
                 kind: CellType::Switch,
                 loc: String::from("WL"),
                 area: switch.dims.area(mos) * scale,
@@ -160,11 +157,11 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
             results.push(report);
         }
 
-        let bits = (v.as_vec()?.len() as Float).log2().ceil() as usize;
+        let bits = (v.len() as Float).log2().ceil() as usize;
         let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, mos)?;
         let report = Report {
             name: target,
-            count: n,
+            count: config.n,
             kind: CellType::Logic,
             loc: String::from("WL"),
             area: logic.dims.area(mos) * scale,
@@ -172,21 +169,21 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
         results.push(report);
     } else {
         warnln!(
-            "No 'wl' key supplied, skipping wordline drivers for config {:?}",
-            config.path
+            "No 'wl' key supplied, skipping wordline drivers for config {}",
+            id
         )
     }
 
     // BL peripheral area
-    let mos = (1, m);
-    if let Some(v) = config.get("bl") {
-        let dx = m as Float * core.dx_bl;
+    let mos = (1, config.m);
+    if let Some(v) = &config.bl {
+        let dx = config.m as Float * core.dx_bl;
 
-        for voltage in v.as_vec()? {
+        for voltage in v {
             let (target, switch) = locate_switch(*voltage, dx, switches, mos)?;
             let report = Report {
                 name: target,
-                count: m,
+                count: config.m,
                 kind: CellType::Switch,
                 loc: String::from("BL"),
                 area: switch.dims.area(mos) * scale,
@@ -194,11 +191,11 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
             results.push(report);
         }
 
-        let bits = (v.as_vec()?.len() as Float).log2().ceil() as usize;
+        let bits = (v.len() as Float).log2().ceil() as usize;
         let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, mos)?;
         let report = Report {
             name: target,
-            count: m,
+            count: config.m,
             kind: CellType::Logic,
             loc: String::from("BL"),
             area: logic.dims.area(mos) * scale,
@@ -206,21 +203,21 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
         results.push(report);
     } else {
         warnln!(
-            "No 'bl' key supplied, skipping bitline drivers for config {:?}",
-            config.path
+            "No 'bl' key supplied, skipping bitline drivers for config {}",
+            id
         )
     }
 
     // Well peripheral area
-    let mos = (1, m);
-    if let Some(v) = config.get("well") {
-        let dx = n as Float * ((core.dx_bl + core.dx_wl) / 2.0) * WELL_SCALE;
+    let mos = (1, config.m);
+    if let Some(v) = &config.well {
+        let dx = config.n as Float * ((core.dx_bl + core.dx_wl) / 2.0) * WELL_SCALE;
 
-        for voltage in v.as_vec()? {
+        for voltage in v {
             let (target, switch) = locate_switch(*voltage, dx, switches, mos)?;
             let report = Report {
                 name: target,
-                count: m,
+                count: config.m,
                 kind: CellType::Switch,
                 loc: String::from("Well"),
                 area: switch.dims.area(mos) * scale,
@@ -228,7 +225,7 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
             results.push(report);
         }
 
-        let bits = (v.as_vec()?.len() as Float).log2().ceil() as usize;
+        let bits = (v.len() as Float).log2().ceil() as usize;
         let (target, logic) = locate_logic(dx * LOGIC_SCALE, bits, logics, SINGLE)?;
         let report = Report {
             name: target,
@@ -241,15 +238,13 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
     } else {
         warnln!(
             "No 'well' key supplied, skipping well drivers for config {}",
-            config.path
+            id
         )
     }
 
     // ADC area
-    if let (Some(enob), Some(fs), Some(adcs)) =
-        (config.get("enob"), config.get("fs"), config.get("adcs"))
-    {
-        let (enob, fs, adcs) = (enob.to_usize()?, fs.to_float()?, adcs.to_usize()?);
+    if let (Some(enob), Some(fs), Some(adcs)) = (config.enob, config.fs, config.adcs) {
+        let (enob, fs, adcs) = (enob, fs, adcs);
         let mos = (1, adcs);
 
         let (target, adc) = locate_adc(fs, enob, db.retrieve(CellType::ADC)?, mos)?;
@@ -263,7 +258,10 @@ pub fn tabulate(config: &Config, db: &DB, scale: Float) -> Result<Reports, Memea
 
         results.push(report);
     } else {
-        warnln!("Missing ADC config info (expecting 'enob', 'fs', and 'adcs'); ADCs will not be generated");
+        warnln!(
+            "Missing ADC config info for {} (expecting 'enob', 'fs', and 'adcs'); ADCs will not be generated", 
+            id
+        );
     }
 
     Ok(results)
