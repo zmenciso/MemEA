@@ -1,61 +1,71 @@
 use clap::Parser;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use memea::config::Config;
 use memea::*;
 
 const DEFAULT_DB: &str = "./data/db.txt";
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, name = "MemEA", about = "Layout-informed memory macro area estimator")]
 pub struct Args {
-    #[arg(required = true)]
+    #[arg(help = "Path(s) to configuration file(s)")]
     input: Vec<PathBuf>,
 
-    #[arg(short, long, default_value = DEFAULT_DB)]
+    #[arg(short, long, default_value = DEFAULT_DB, help = "Path to the database file")]
     db: PathBuf,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Export results to file in CSV format")]
     export: Option<PathBuf>,
 
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        help = "Do not print breakdown; only print total area for each configuration (automatically toggles `-q`)"
+    )]
     area_only: bool,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Suppress nonessential messages")]
     quiet: bool,
 
-    #[arg(long, value_names = ["FROM", "TO"], num_args = 2)]
+    #[arg(long, value_names = ["FROM", "TO"], num_args = 2, help = "Use built-in transistor scaling data to scale area from source technology node (e.g. 65) to target technology node (e.g. 22)")]
     autoscale: Option<Vec<usize>>,
 
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Manually specify a scaling value to scale area (e.g. 0.124)"
+    )]
     scale: Option<Float>,
 
-    #[arg(long)]
-    gds: bool,
+    #[arg(
+        short,
+        long,
+        help = "Interactively build a database file from GDS and LEF data"
+    )]
+    build_db: bool,
 
-    #[arg(long)]
-    gds_layer: Option<i16>,
-
-    #[arg(short, long)]
-    interactive: bool,
+    #[arg(long, help = "Launch GUI")]
+    gui: bool,
 }
 
 fn main() -> Result<(), MemeaError> {
     let args = Args::parse();
     let verbose = !args.quiet && !args.area_only;
 
-    if args.gds {
+    if args.build_db {
         println!("{LOGO}");
-        println!("{}", bar(Some("Interactive GDS Import"), '#'));
-
-        gds::read(&args.input[0].to_string_lossy(), args.gds_layer)?;
-
+        println!("{}", bar(Some("Interactive Database Builder"), '#'));
+        lef::lefin()?;
+        return Ok(());
+    } else if args.input.is_empty() {
+        errorln!("No configuration files provided, aborting...");
         return Ok(());
     }
 
-    if args.interactive {
-        // TODO: Interactive
+    if args.gui {
+        // TODO: GUI
+        errorln!("GUI not yet implemented, falling back to CLI");
     }
 
     let start = Instant::now();
@@ -64,13 +74,7 @@ fn main() -> Result<(), MemeaError> {
     vprintln!(verbose, "Built database in {:?}", start.elapsed());
     let start = Instant::now();
 
-    let mut configs: Vec<Config> = Vec::new();
-    for c in args.input {
-        match config::read(&c) {
-            Ok(r) => configs.push(r),
-            Err(e) => errorln!("Failed to read config {:?} ({})", &c, e),
-        }
-    }
+    let configs = config::read_all(&args.input);
 
     let scale: Float = match args.scale {
         Some(val) => val,
@@ -91,10 +95,12 @@ fn main() -> Result<(), MemeaError> {
     );
     let start = Instant::now();
 
-    let mut reports: Vec<Reports> = Vec::new();
-    for c in &configs {
-        match tabulate::tabulate(c, &db, scale) {
-            Ok(r) => reports.push(r),
+    let mut reports: HashMap<String, Reports> = HashMap::new();
+    for (name, c) in &configs {
+        match tabulate::tabulate(name, c, &db, scale) {
+            Ok(r) => {
+                reports.insert(name.clone(), r);
+            }
             Err(e) => errorln!("Failed to tabulate config: {}", e),
         }
     }
@@ -117,14 +123,12 @@ fn main() -> Result<(), MemeaError> {
 
     match args.area_only {
         true => {
-            for i in 0..reports.len() {
-                println!("{}\t{}", &configs[i].path, export::area(&reports[i]));
+            for (name, r) in &reports {
+                println!("{}\t{}", name, export::area(r));
             }
         }
         false => {
-            let names: Vec<String> = configs.iter().map(|c| c.path.to_string()).collect();
-
-            export::export(names, &reports, &args.export)?;
+            export::export(&reports, &args.export)?;
         }
     }
 
