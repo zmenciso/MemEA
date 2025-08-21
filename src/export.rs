@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::{metadata, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -30,8 +31,7 @@ pub fn area(reports: &Reports) -> Float {
 /// * `report` - Pointer to a `Report` to output
 /// * `filename` - Path of the output file to write.  If None, writes to stdout
 pub fn export(
-    inputs: Vec<String>,
-    reports: &[Reports],
+    reports: &HashMap<String, Reports>,
     filename: &Option<PathBuf>,
 ) -> Result<(), MemeaError> {
     let buf = match filename {
@@ -75,11 +75,11 @@ pub fn export(
         );
     }
 
-    for i in 0..reports.len() {
+    for (name, r) in reports {
         if buf.is_none() {
-            content = format!("{}{}", content, fmt_direct(&inputs[i], &reports[i]));
+            content = format!("{}{}", content, fmt_direct(name, r));
         } else {
-            content = format!("{}{}", content, fmt_csv(&inputs[i], &reports[i]));
+            content = format!("{}{}", content, fmt_csv(name, r));
         }
     }
 

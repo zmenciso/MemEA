@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use serde::Deserialize;
 use std::fs;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::io::BufReader;
+use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
 
-use crate::decode;
-use crate::{warnln, MemeaError};
-use crate::{Value, ValueTypes};
+use crate::{errorln, Float, MemeaError};
+
+type Configs = HashMap<String, Config>;
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -14,87 +14,58 @@ pub enum ConfigError {
     MissingOption(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
-    config: HashMap<String, Value>,
-    pub path: String,
+    pub name: Option<String>,
+
+    // Essential
+    pub n: usize,
+    pub m: usize,
+    pub cell: String,
+
+    // Optional
+    pub bl: Option<Vec<Float>>,
+    pub wl: Option<Vec<Float>>,
+    pub well: Option<Vec<Float>>,
+
+    // ADC
+    pub adcs: Option<usize>,
+    pub enob: Option<usize>,
+    pub fs: Option<Float>,
+
+    // Additional options
+    pub options: Option<HashMap<String, String>>,
 }
 
-impl Config {
-    /// Create new Config from file path
-    fn new(name: &Path) -> Config {
-        Config {
-            config: HashMap::new(),
-            path: name.to_string_lossy().into_owned(),
-        }
-    }
-
-    /// Inserts an option into `Config`, returns `Some(x)` if `key` is already in `Config`,
-    /// where `x` is the previous value.  Returns None if `key` is a new option, or if the option
-    /// is not recognized
-    ///
-    /// # Arguments
-    /// * `key` - Name of the option to insert
-    /// * `value` - Value of the option (of type Target)
-    pub fn update(&mut self, key: &str, value: &str) -> Result<Option<Value>, MemeaError> {
-        let option = key.to_owned();
-
-        match key {
-            "n" | "m" | "adcs" | "enob" => Ok(self
-                .config
-                .insert(option, decode(value, ValueTypes::Usize)?)),
-            "fs" => Ok(self
-                .config
-                .insert(option, decode(value, ValueTypes::Float)?)),
-            "bl" | "wl" | "well" => Ok(self
-                .config
-                .insert(option, decode(value, ValueTypes::FloatVec)?)),
-            "cell" => Ok(self
-                .config
-                .insert(option, decode(value, ValueTypes::String)?)),
-            _ => {
-                warnln!("Unrecognized option {} (value {})", key, value);
-                Ok(None)
-            }
-        }
-    }
-
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        self.config.get(key)
-    }
-
-    pub fn retrieve(&self, key: &str) -> Result<&Value, ConfigError> {
-        self.config
-            .get(key)
-            .ok_or(ConfigError::MissingOption(key.to_string()))
-    }
-}
+impl Config {}
 
 /// Reads configuration from file and returns a `Config` struct result.
 ///
 /// # Arguments
 /// * `filename` - Path of the file to read (`PathBuf`)
-pub fn read(filename: &std::path::PathBuf) -> Result<Config, MemeaError> {
-    let mut config = Config::new(filename);
-
+fn read(filename: &std::path::PathBuf) -> Result<Config, MemeaError> {
     let file = fs::File::open(filename)?;
     let rdr = BufReader::new(file);
+    let config: Config = serde_yaml::from_reader(rdr)?;
 
-    for line in rdr.lines() {
-        let line = line?;
-        let line = line.trim();
+    Ok(config)
+}
 
-        // Skip comments and empty lines
-        if line.starts_with('#') || line.is_empty() {
-            continue;
-        }
+pub fn read_all(paths: &Vec<PathBuf>) -> Configs {
+    let mut configs: Configs = HashMap::new();
+    for c in paths {
+        match read(c) {
+            Ok(r) => {
+                let name = match &r.name {
+                    Some(s) => s.clone(),
+                    None => c.to_string_lossy().into(),
+                };
 
-        if let Some((param, value)) = line.split_once([':', '=']) {
-            config.update(param.trim(), value.trim())?;
-        } else {
-            warnln!("Delimeter not found in string: {}", line);
+                configs.insert(name, r);
+            }
+            Err(e) => errorln!("Failed to read config {:?} ({})", &c, e),
         }
     }
 
-    Ok(config)
+    configs
 }
