@@ -23,5 +23,6 @@ Cargo.lock
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# GDS files for testing
+# GDS and LEF files for testing
 *.gds
+*.lef
