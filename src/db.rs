@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader};
 use thiserror::Error;
 
 use crate::MemeaError;
-use crate::{Float, Mosaic, Range};
+use crate::{parse_range, parse_tuple, Float, Mosaic, Range};
 
 pub type CellList = HashMap<String, Cell>;
 
@@ -99,7 +99,8 @@ impl DB {
 pub struct Dims {
     width: Float,
     height: Float,
-    enc: Float,
+    enc_x: Float,
+    enc_y: Float,
 }
 
 impl Default for Dims {
@@ -113,12 +114,30 @@ impl Dims {
         Dims {
             width: 0.0,
             height: 0.0,
-            enc: 0.0,
+            enc_x: 0.0,
+            enc_y: 0.0,
+        }
+    }
+
+    pub fn dump(self) -> String {
+        format!(
+            "enc_x {}\nenc_y {}\nheight {}\nwidth {}",
+            self.enc_x, self.enc_y, self.height, self.width
+        )
+    }
+
+    pub fn from(width: Float, height: Float, enc_x: Float, enc_y: Float) -> Dims {
+        Dims {
+            width,
+            height,
+            enc_x,
+            enc_y,
         }
     }
 
     pub fn area(self, (n, m): Mosaic) -> Float {
-        ((m as Float * self.width) + self.enc) * ((n as Float * self.height) + self.enc)
+        ((m as Float * self.width) + (self.enc_x * 2.0))
+            * ((n as Float * self.height) + (self.enc_y * 2.0))
     }
 }
 
@@ -231,19 +250,6 @@ impl Geometry for ADC {
     }
 }
 
-pub fn parse_range(line: &str) -> Result<Range, MemeaError> {
-    let (min, max) = line
-        .trim()
-        .trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != ',' && c != ';' && c != '-')
-        .split_once(|c: char| c == ',' || c == ';' || c.is_whitespace())
-        .ok_or(DBError::TupleParseError(line.to_string()))?;
-
-    let min: Float = min.trim().parse::<Float>()?;
-    let max: Float = max.trim().parse::<Float>()?;
-
-    Ok(Range { min, max })
-}
-
 /// Add a property to a given cell
 ///
 /// # Arguments
@@ -262,34 +268,62 @@ fn update_cell(cell: &mut Cell, line: &str) -> Result<(), MemeaError> {
         Cell::Core(core) => match target.as_str() {
             "dx_wl" => core.dx_wl = value.parse::<Float>()?,
             "dx_bl" => core.dx_bl = value.parse::<Float>()?,
-            "width" => core.dims.width = value.parse::<Float>()?,
-            "height" => core.dims.height = value.parse::<Float>()?,
-            "enc" => core.dims.enc = value.parse::<Float>()?,
+            "size" => {
+                let (x, y) = parse_tuple(value)?;
+                core.dims.width = x;
+                core.dims.height = y;
+            }
+            "enc" => {
+                let (x, y) = parse_tuple(value)?;
+                core.dims.enc_x = x;
+                core.dims.enc_y = y;
+            }
             _ => {}
         },
         Cell::Logic(logic) => match target.as_str() {
             "dx" => logic.dx = value.parse::<Float>()?,
             "bits" => logic.bits = value.parse::<usize>()?,
             "fs" => logic.fs = value.parse::<Float>()?,
-            "width" => logic.dims.width = value.parse::<Float>()?,
-            "height" => logic.dims.height = value.parse::<Float>()?,
-            "enc" => logic.dims.enc = value.parse::<Float>()?,
+            "size" => {
+                let (x, y) = parse_tuple(value)?;
+                logic.dims.width = x;
+                logic.dims.height = y;
+            }
+            "enc" => {
+                let (x, y) = parse_tuple(value)?;
+                logic.dims.enc_x = x;
+                logic.dims.enc_y = y;
+            }
             _ => {}
         },
         Cell::Switch(switch) => match target.as_str() {
             "dx" => switch.dx = value.parse::<Float>()?,
             "voltage" => switch.voltage = parse_range(value)?,
-            "width" => switch.dims.width = value.parse::<Float>()?,
-            "height" => switch.dims.height = value.parse::<Float>()?,
-            "enc" => switch.dims.enc = value.parse::<Float>()?,
+            "size" => {
+                let (x, y) = parse_tuple(value)?;
+                switch.dims.width = x;
+                switch.dims.height = y;
+            }
+            "enc" => {
+                let (x, y) = parse_tuple(value)?;
+                switch.dims.enc_x = x;
+                switch.dims.enc_y = y;
+            }
             _ => {}
         },
         Cell::ADC(adc) => match target.as_str() {
             "bits" => adc.bits = value.parse::<usize>()?,
             "fs" => adc.fs = value.parse::<Float>()?,
-            "width" => adc.dims.width = value.parse::<Float>()?,
-            "height" => adc.dims.height = value.parse::<Float>()?,
-            "enc" => adc.dims.enc = value.parse::<Float>()?,
+            "size" => {
+                let (x, y) = parse_tuple(value)?;
+                adc.dims.width = x;
+                adc.dims.height = y;
+            }
+            "enc" => {
+                let (x, y) = parse_tuple(value)?;
+                adc.dims.enc_x = x;
+                adc.dims.enc_y = y;
+            }
             _ => {}
         },
     }
