@@ -61,7 +61,7 @@ fn locate_adc(
     let mut sel: Option<&ADC> = None;
 
     for (name, adc) in &db.adc {
-        let condition = || -> bool { adc.fs >= fs && adc.bits >= bits };
+        let condition = || -> bool { adc.fs >= fs && adc.enob >= bits as Float };
 
         if sel.is_none() && condition() {
             (target, sel) = (name.clone(), Some(adc));
@@ -249,11 +249,10 @@ pub fn tabulate(
     }
 
     // ADC area
-    if let (Some(enob), Some(fs), Some(adcs)) = (config.enob, config.fs, config.adcs) {
-        let (enob, fs, adcs) = (enob, fs, adcs);
+    if let (Some(bits), Some(fs), Some(adcs)) = (config.bits, config.fs, config.adcs) {
         let mos = (1, adcs);
 
-        let (target, adc) = locate_adc(db, fs, enob, mos)?;
+        let (target, adc) = locate_adc(db, fs, bits, mos)?;
         let report = Report {
             name: target,
             count: adcs,
@@ -265,7 +264,7 @@ pub fn tabulate(
         results.push(report);
     } else {
         warnln!(
-            "Missing ADC config info for {} (expecting 'enob', 'fs', and 'adcs'); ADCs will not be generated", 
+            "Missing ADC config info for {} (expecting 'enob', 'fs', and 'adcs'); ADCs will not be generated",
             id
         );
     }

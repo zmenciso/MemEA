@@ -1,3 +1,10 @@
+//! LEF file parsing and database creation for MemEA memory components.
+//!
+//! This module provides functionality to parse Library Exchange Format (LEF) files
+//! and create component databases. It extracts cell dimensions from LEF files and
+//! optionally augments them with enclosure data from corresponding GDS layout files.
+//! The resulting data is saved as a component database for use in area estimation.
+
 use dialoguer::Input;
 use gds21::GdsLibrary;
 use regex::Regex;
@@ -9,14 +16,31 @@ use thiserror::Error;
 use crate::{db::*, gds, FileCompleter, QueryDefault};
 use crate::{errorln, query, vprintln, warnln, Float, MemeaError};
 
+/// Errors that can occur during LEF file parsing.
 #[derive(Debug, Error)]
 pub enum LefError {
+    /// Indicates that a MACRO line in the LEF file is malformed.
     #[error("Malformed MACRO line: {0}")]
     InvalidMacro(String),
+    /// Indicates that a SIZE line in the LEF file cannot be parsed.
     #[error("Malformed SIZE line: {0}")]
     InvalidSize(String),
 }
 
+/// Interactively adds a cell to the database with user confirmation and type selection.
+///
+/// This function displays cell information to the user, asks for confirmation to add
+/// the cell, and prompts for the cell type (core, switch, logic, or ADC). It handles
+/// the interactive workflow for building a component database from LEF data.
+///
+/// # Arguments
+/// * `name` - Name of the cell to add
+/// * `dims` - Physical dimensions of the cell
+/// * `db` - Mutable reference to the database to update
+///
+/// # Returns
+/// * `Ok(())` - Cell was successfully processed (added or skipped)
+/// * `Err(MemeaError)` - Error during user interaction or database update
 fn add_cell(name: &str, dims: Dims, db: &mut Database) -> Result<(), MemeaError> {
     println!("\nCell.......: {name}");
     dims.dump();
@@ -64,6 +88,28 @@ fn add_cell(name: &str, dims: Dims, db: &mut Database) -> Result<(), MemeaError>
     Ok(())
 }
 
+/// Interactive LEF file processing workflow.
+///
+/// This function provides an interactive command-line interface for processing
+/// LEF files and creating component databases. It prompts the user for:
+/// - GDS file (optional, for enclosure computation)
+/// - LEF file (required, for cell dimensions)
+/// - Output database file (YAML or JSON format)
+///
+/// # Arguments
+/// * `verbose` - Whether to show detailed processing information
+///
+/// # Returns
+/// * `Ok(())` - LEF processing completed successfully
+/// * `Err(MemeaError)` - File I/O error, parsing error, or user interaction error
+///
+/// # Examples
+/// ```no_run
+/// use memea::lef::lefin;
+///
+/// // Start interactive LEF processing
+/// lefin(true).expect("LEF processing failed");
+/// ```
 pub fn lefin(verbose: bool) -> Result<(), MemeaError> {
     let mut gdsfile: String;
     let mut leffile: String;
@@ -142,6 +188,26 @@ pub fn lefin(verbose: bool) -> Result<(), MemeaError> {
     read_lef(PathBuf::from(leffile), gdsin, PathBuf::from(dbout), verbose)
 }
 
+/// Parses width and height from a LEF SIZE line using regex.
+///
+/// This function extracts two floating-point numbers from a SIZE line in a LEF file,
+/// representing the width and height of a cell in micrometers.
+///
+/// # Arguments
+/// * `line` - The SIZE line from the LEF file to parse
+///
+/// # Returns
+/// * `Ok((width, height))` - Successfully parsed dimensions in micrometers
+/// * `Err(LefError::InvalidSize)` - Line format is invalid or missing numbers
+///
+/// # Examples
+/// ```
+/// use memea::lef::parse_size;
+///
+/// let line = "    SIZE 1.5 BY 2.0 ;";
+/// let (w, h) = parse_size(line).expect("Failed to parse size");
+/// assert_eq!((w, h), (1.5, 2.0));
+/// ```
 fn parse_size(line: &str) -> Result<(Float, Float), LefError> {
     let re = Regex::new(r"([0-9]+\.?[0-9]*)").unwrap();
 
@@ -156,6 +222,29 @@ fn parse_size(line: &str) -> Result<(Float, Float), LefError> {
     }
 }
 
+/// Reads and processes a LEF file to create a component database.
+///
+/// This function parses a LEF file line by line, extracting MACRO names and SIZE
+/// information to build component dimensions. If a GDS file is provided, it augments
+/// the dimensions with enclosure data computed from the layout geometry.
+///
+/// # Arguments
+/// * `lefin` - Path to the input LEF file
+/// * `gdsin` - Optional path to GDS file for enclosure computation
+/// * `dbout` - Path where the output database should be saved
+/// * `verbose` - Whether to show detailed processing information
+///
+/// # Returns
+/// * `Ok(())` - LEF file processed and database saved successfully
+/// * `Err(MemeaError)` - File I/O error, parsing error, or database save error
+///
+/// # LEF File Format
+/// The function expects LEF files with MACRO definitions containing SIZE lines:
+/// ```text
+/// MACRO cell_name
+///   SIZE width BY height ;
+/// END cell_name
+/// ```
 fn read_lef(
     lefin: PathBuf,
     gdsin: Option<PathBuf>,
