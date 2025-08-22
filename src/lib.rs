@@ -1,14 +1,33 @@
 pub mod config;
 pub mod db;
 pub mod export;
+pub mod gds;
+pub mod lef;
 pub mod tabulate;
 
 use crate::config::ConfigError;
-use crate::db::{CellType, DBError};
+use crate::lef::LefError;
+
+use dialoguer::Completion;
+use std::fmt::Write;
+use std::fs;
+use std::io::{self, Write as IoWrite};
+use std::path::Path;
+use terminal_size::{terminal_size, Width};
 use thiserror::Error;
 
 pub type Float = f32;
 pub type Mosaic = (usize, usize);
+
+pub const VER: &str = "v0.1.2";
+
+pub const LOGO: &str = r#"
+    __  ___               _________ 
+   /  |/  /__  ____ ___  / ____/   |
+  / /|_/ / _ \/ __ `__ \/ __/ / /| |
+ / /  / /  __/ / / / / / /___/ ___ |
+/_/  /_/\___/_/ /_/ /_/_____/_/  |_|
+"#;
 
 #[macro_export]
 macro_rules! eliteral {
@@ -57,37 +76,143 @@ macro_rules! errorln {
     ($($tt:tt)*) => { $crate::__log_internal!(eprintln, "31", "ERROR", $($tt)*) }
 }
 
-#[derive(Debug, Error)]
-pub enum ValueError {
-    #[error("Expected a Value::Usize")]
-    NotUsize,
-    #[error("Expected a Value::Float")]
-    NotFloat,
-    #[error("Expected a Value::FloatVec")]
-    NotFloatVec,
-    #[error("Expected a Value::String")]
-    NotString,
+// Verbose printing
+#[macro_export]
+macro_rules! vprintln {
+    ($verbose:expr, $($arg:tt)*) => {
+        if $verbose {
+            $crate::infoln!($($arg)*);
+        }
+    };
 }
 
 #[derive(Debug, Error)]
 pub enum MemeaError {
+    #[error("GDS parsing error: {0}")]
+    GdsParse(#[from] gds::GdsError),
+    #[error("GDS error: {0}")]
+    Gds(#[from] gds21::GdsError),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-
     #[error("Parse int error: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
-
     #[error("Parse float error: {0}")]
     ParseFloat(#[from] std::num::ParseFloatError),
-
     #[error("Config error: {0}")]
     Config(#[from] ConfigError),
-
-    #[error("Value error: {0}")]
-    Value(#[from] ValueError),
-
+    #[error("LEF error: {0}")]
+    Lef(#[from] LefError),
+    #[error("Dialogue error: {0}")]
+    Dialogue(#[from] dialoguer::Error),
+    #[error("YAML error: {0}")]
+    SerdeYaml(#[from] serde_yaml::Error),
+    #[error("JSON error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+    #[error("CSV export error: {0}")]
+    CSV(#[from] csv::Error),
+    #[error("Parse error: {0}")]
+    ParseError(String),
     #[error("Database error: {0}")]
-    Database(#[from] DBError),
+    DatabaseError(#[from] crate::db::DBError),
+}
+
+pub enum QueryDefault {
+    Yes,
+    No,
+    Neither,
+}
+
+pub struct FileCompleter;
+
+// TODO: Remove spaghetti
+impl Completion for FileCompleter {
+    fn get(&self, input: &str) -> Option<String> {
+        let expanded = shellexpand::tilde(input).to_string();
+        let path = Path::new(&expanded);
+        if let Some(parent) = path.parent() {
+            if let Ok(entries) = fs::read_dir(parent) {
+                for entry in entries.flatten() {
+                    if let Some(name) = entry.path().file_name().and_then(|n| n.to_str()) {
+                        if name.starts_with(path.file_name().and_then(|n| n.to_str()).unwrap_or(""))
+                        {
+                            return Some(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+pub fn query(prompt: &str, warn: bool, default: QueryDefault) -> Result<bool, MemeaError> {
+    let query: &str = match default {
+        QueryDefault::No => " (y/N) ",
+        QueryDefault::Yes => " (Y/n) ",
+        QueryDefault::Neither => " (y/n) ",
+    };
+
+    match warn {
+        true => warn!("{} {}", prompt, query),
+        false => {
+            print!("{prompt} {query}");
+            std::io::stdout().flush()?;
+        }
+    }
+
+    let mut input = String::new();
+
+    loop {
+        io::stdin().read_line(&mut input)?;
+        input = input.trim().to_lowercase();
+
+        if input.is_empty() {
+            return match default {
+                QueryDefault::Neither => continue,
+                QueryDefault::No => Ok(false),
+                QueryDefault::Yes => Ok(true),
+            };
+        }
+
+        match input.as_str() {
+            "y" | "ye" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => continue,
+        }
+    }
+}
+
+pub fn bar(header: Option<&str>, ch: char) -> String {
+    let width = if let Some((Width(w), _)) = terminal_size() {
+        w as usize
+    } else {
+        80
+    };
+
+    let mut output = String::new();
+
+    if let Some(text) = header {
+        writeln!(output, "{}", ch.to_string().repeat(width)).ok();
+
+        let text_len = text.chars().count();
+        let padding = width.saturating_sub(text_len + 2);
+        let left_pad = padding / 2;
+
+        writeln!(
+            output,
+            "{}{}{}{}{}",
+            ch,
+            " ".repeat(left_pad),
+            text,
+            " ".repeat(padding - left_pad),
+            ch
+        )
+        .ok();
+    }
+
+    write!(output, "{}", ch.to_string().repeat(width)).ok();
+
+    output
 }
 
 fn get_scale(n: &usize) -> Option<Float> {
@@ -128,99 +253,26 @@ pub fn scale(from: usize, to: usize) -> Float {
     }
 }
 
-#[derive(Debug)]
-pub struct Report {
-    pub name: String,
-    pub count: usize,
-    pub kind: CellType,
-    pub loc: String,
-    pub area: Float,
-}
-
-pub type Reports = Vec<Report>;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Range {
     pub min: Float,
     pub max: Float,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum Value {
-    Float(Float),
-    Usize(usize),
-    String(String),
-    FloatVec(Vec<Float>),
+pub fn parse_range(line: &str) -> Result<Range, MemeaError> {
+    let (min, max) = parse_tuple(line)?;
+    Ok(Range { min, max })
 }
 
-#[allow(dead_code)]
-impl Value {
-    fn to_float(&self) -> Result<Float, ValueError> {
-        match self {
-            Value::Float(num) => Ok(*num),
-            _ => Err(ValueError::NotFloat),
-        }
-    }
+pub fn parse_tuple(line: &str) -> Result<(Float, Float), MemeaError> {
+    let (a, b) = line
+        .trim()
+        .trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != ',' && c != ';' && c != '-')
+        .split_once(|c: char| c == ',' || c == ';' || c.is_whitespace())
+        .ok_or(MemeaError::ParseError(line.to_string()))?;
 
-    fn to_usize(&self) -> Result<usize, ValueError> {
-        match self {
-            Value::Usize(num) => Ok(*num),
-            _ => Err(ValueError::NotUsize),
-        }
-    }
+    let a: Float = a.trim().parse::<Float>()?;
+    let b: Float = b.trim().parse::<Float>()?;
 
-    fn as_vec(&self) -> Result<&Vec<Float>, ValueError> {
-        match self {
-            Value::FloatVec(v) => Ok(v),
-            _ => Err(ValueError::NotFloatVec),
-        }
-    }
-
-    fn as_str(&self) -> Result<&str, ValueError> {
-        match self {
-            Value::String(s) => Ok(s),
-            _ => Err(ValueError::NotString),
-        }
-    }
-
-    fn to_string(&self) -> Result<String, ValueError> {
-        match self {
-            Value::String(s) => Ok(s.to_owned()),
-            _ => Err(ValueError::NotString),
-        }
-    }
-}
-
-enum ValueTypes {
-    Float,
-    Usize,
-    String,
-    FloatVec,
-}
-
-/// Decodes string input into Value
-///
-/// # Arguments
-/// * `input` - Value to be decoded
-/// * `kind` - Data type of `input` constrained by `Target`
-fn decode(input: &str, kind: ValueTypes) -> Result<Value, MemeaError> {
-    match kind {
-        ValueTypes::Float => {
-            let val = input.parse::<Float>()?;
-            Ok(Value::Float(val))
-        }
-        ValueTypes::Usize => {
-            let val = input.parse::<usize>()?;
-            Ok(Value::Usize(val))
-        }
-        ValueTypes::String => Ok(Value::String(input.to_owned())),
-        ValueTypes::FloatVec => {
-            let vals: Result<Vec<Float>, _> = input
-                .split(|c: char| c == ',' || c == ';' || c.is_whitespace())
-                .filter(|s| !s.trim().is_empty())
-                .map(|x| x.trim().parse::<Float>())
-                .collect();
-            Ok(Value::FloatVec(vals?)) // ? unwraps or returns Err
-        }
-    }
+    Ok((a, b))
 }
