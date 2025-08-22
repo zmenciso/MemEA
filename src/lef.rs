@@ -1,14 +1,13 @@
-use chrono::Local;
 use dialoguer::Input;
 use gds21::GdsLibrary;
 use regex::Regex;
-use std::fs::{metadata, File, OpenOptions};
-use std::io::{stdin, BufRead, BufReader, BufWriter, Write};
+use std::fs::{metadata, File};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-use crate::{bar, db::*, gds, FileCompleter, QueryDefault, VER};
-use crate::{errorln, infoln, query, warnln, Float, MemeaError};
+use crate::{db::*, gds, FileCompleter, QueryDefault};
+use crate::{errorln, query, vprintln, warnln, Float, MemeaError};
 
 #[derive(Debug, Error)]
 pub enum LefError {
@@ -18,73 +17,57 @@ pub enum LefError {
     InvalidSize(String),
 }
 
-fn get_value(prompt: &str) -> Result<String, MemeaError> {
-    print!("{prompt} ");
+fn add_cell(name: &str, dims: Dims, db: &mut Database) -> Result<(), MemeaError> {
+    println!("\nCell.......: {name}");
+    dims.dump();
+    println!();
 
-    let mut value = String::new();
-    stdin().read_line(&mut value)?;
-    Ok(value)
-}
-
-fn write_cell(name: &str, dims: Dims, wtr: &mut BufWriter<File>) -> Result<(), MemeaError> {
     // See if the user wants to add it
     if !query(
         &format!("Add cell {name} to database?"),
-        true,
+        false,
         QueryDefault::Yes,
     )? {
         return Ok(());
     }
 
-    let mut celltype = String::new();
-    let allowed = [
-        "1", "2", "3", "4", "core", "switch", "sw", "logic", "log", "adc",
-    ];
+    loop {
+        let mut celltype: String = prompt("Cell type");
+        celltype = celltype.trim().to_lowercase();
 
-    while !allowed.iter().any(|&s| celltype.contains(s)) {
         match celltype.as_str() {
             "1" | "core" => {
-                writeln!(wtr, "core: {name}")?;
-                writeln!(wtr, "dx_wl {}", get_value("dx_wl:")?)?;
-                writeln!(wtr, "dx_bl {}", get_value("dx_bl:")?)?;
-                writeln!(wtr, "{}", dims.dump())?;
+                db.add_core(name, dims);
+                break;
             }
             "2" | "switch" | "sw" => {
-                writeln!(wtr, "switch: {name}")?;
-                writeln!(wtr, "voltage {}", get_value("voltage:")?)?;
-                writeln!(wtr, "dx {}", get_value("dx:")?)?;
-                writeln!(wtr, "{}", dims.dump())?;
+                db.add_switch(name, dims);
+                break;
             }
             "3" | "logic" | "log" => {
-                writeln!(wtr, "logic: {name}")?;
-                writeln!(wtr, "bits {}", get_value("bits:")?)?;
-                writeln!(wtr, "fs {}", get_value("fs:")?)?;
-                writeln!(wtr, "dx {}", get_value("dx:")?)?;
-                writeln!(wtr, "{}", dims.dump())?;
+                db.add_logic(name, dims);
+                break;
             }
             "4" | "adc" => {
-                writeln!(wtr, "adc: {name}")?;
-                writeln!(wtr, "bits {}", get_value("bits:")?)?;
-                writeln!(wtr, "fs {}", get_value("fs:")?)?;
-                writeln!(wtr, "{}", dims.dump())?;
+                db.add_adc(name, dims);
+                break;
             }
             _ => {
-                print!("Cell type? 1/core, 2/sw/switch, 3/log/logic, 4/adc ");
-                stdin().read_line(&mut celltype)?;
-                celltype = celltype.to_lowercase();
+                errorln!(
+                    "Invalid cell type (must be one of 1/core, 2/sw/switch, 3/log/logic, or 4/adc)"
+                );
             }
         }
     }
 
-    writeln!(wtr)?;
-    println!("{}", bar(None, '-'));
-
+    println!("\n{}", crate::bar(None, '-'));
     Ok(())
 }
 
-pub fn lefin() -> Result<(), MemeaError> {
+pub fn lefin(verbose: bool) -> Result<(), MemeaError> {
     let mut gdsfile: String;
     let mut leffile: String;
+    let mut dbout: String;
 
     loop {
         gdsfile = Input::new()
@@ -92,13 +75,16 @@ pub fn lefin() -> Result<(), MemeaError> {
             .completion_with(&FileCompleter)
             .interact_text()?;
 
+        let path = Path::new(&gdsfile);
+
         if gdsfile.is_empty() {
             warnln!("No GDS file provided; enclosures will not be computed.");
             break;
-        } else if metadata(Path::new(&gdsfile)).is_ok() {
+        } else if metadata(path).is_ok() && path.extension().and_then(|e| e.to_str()) == Some("gds")
+        {
             break;
         } else {
-            errorln!("{} is not a regular file", gdsfile);
+            errorln!("{} is not a GDS file", gdsfile);
         }
     }
 
@@ -108,17 +94,44 @@ pub fn lefin() -> Result<(), MemeaError> {
             .completion_with(&FileCompleter)
             .interact_text()?;
 
-        if metadata(Path::new(&leffile)).is_ok() {
+        let path = Path::new(&leffile);
+
+        if metadata(path).is_ok() && path.extension().and_then(|e| e.to_str()) == Some("lef") {
             break;
         } else {
-            errorln!("{} is not a regular file", leffile);
+            errorln!("{} is not a LEF file", leffile);
         }
     }
 
-    let dbout: String = Input::new()
-        .with_prompt("Output database file")
-        .completion_with(&FileCompleter)
-        .interact_text()?;
+    loop {
+        dbout = Input::new()
+            .with_prompt("Output database file")
+            .completion_with(&FileCompleter)
+            .interact_text()?;
+
+        let valid = valid_ext(&dbout);
+
+        if valid && metadata(&dbout).is_ok() {
+            let allow = query(
+                format!("'{dbout}' already exists. Overwrite?").as_str(),
+                true,
+                crate::QueryDefault::Yes,
+            )?;
+
+            if allow {
+                break;
+            }
+        } else if valid {
+            break;
+        } else {
+            errorln!(
+                "Output database {} must be a YAML (.yml, .yaml) or JSON (.json) file",
+                dbout
+            );
+        }
+    }
+
+    println!();
 
     let gdsin = if gdsfile.is_empty() {
         None
@@ -126,7 +139,7 @@ pub fn lefin() -> Result<(), MemeaError> {
         Some(PathBuf::from(&gdsfile))
     };
 
-    read_lef(PathBuf::from(leffile), gdsin, PathBuf::from(dbout))
+    read_lef(PathBuf::from(leffile), gdsin, PathBuf::from(dbout), verbose)
 }
 
 fn parse_size(line: &str) -> Result<(Float, Float), LefError> {
@@ -143,56 +156,42 @@ fn parse_size(line: &str) -> Result<(Float, Float), LefError> {
     }
 }
 
-fn stamp(wtr: &mut BufWriter<File>) -> Result<(), MemeaError> {
-    let now = Local::now();
-    writeln!(wtr, "MemEA {VER}")?;
-    writeln!(wtr, "File generated with LEF+GDS import on {now}")?;
-
-    Ok(())
-}
-
-fn read_lef(lefin: PathBuf, gdsin: Option<PathBuf>, dbout: PathBuf) -> Result<(), MemeaError> {
+fn read_lef(
+    lefin: PathBuf,
+    gdsin: Option<PathBuf>,
+    dbout: PathBuf,
+    verbose: bool,
+) -> Result<(), MemeaError> {
     let lefin = File::open(lefin)?;
     let rdr = BufReader::new(lefin);
-
-    // If file already exists, prompt to overwrite
-    if metadata(&dbout).is_ok() {
-        let allow = query(
-            format!("'{}' already exists. Overwrite?", dbout.to_string_lossy()).as_str(),
-            true,
-            crate::QueryDefault::Yes,
-        )?;
-
-        if !allow {
-            infoln!("Aborting...");
-            return Ok(());
-        }
-    }
 
     // TODO: Currently assuming microns for LEF, need to scale this by LEF unit scale
     let mut gdsunits = 1e-9;
 
     let map = match gdsin {
         Some(file) => {
-            let lib = GdsLibrary::load(file)?;
+            let lib = GdsLibrary::load(&file)?;
             gdsunits = lib.units.db_unit();
+
+            vprintln!(
+                verbose,
+                "GDS library {} loaded, found {} cells",
+                file.to_string_lossy(),
+                lib.structs.len()
+            );
 
             Some(gds::hash_lib(lib))
         }
         None => None,
     };
 
-    let dbout = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(dbout)?;
-
-    let mut wtr = BufWriter::new(dbout);
-    stamp(&mut wtr)?;
-
     let mut name: String = String::new();
     let mut dims: Option<Dims> = None;
+
+    let mut db = Database::new();
+
+    println!("Cell types: 1/core, 2/sw/switch, 3/log/logic, or 4/adc\n");
+    println!("{}", crate::bar(None, '-'));
 
     for line in rdr.lines() {
         let line = line?;
@@ -201,7 +200,7 @@ fn read_lef(lefin: PathBuf, gdsin: Option<PathBuf>, dbout: PathBuf) -> Result<()
         if line.contains("MACRO") {
             // Push previous cell
             if let Some(c) = dims.take() {
-                write_cell(&name, c, &mut wtr)?;
+                add_cell(&name, c, &mut db)?;
             }
 
             // Get new cell name
@@ -217,7 +216,7 @@ fn read_lef(lefin: PathBuf, gdsin: Option<PathBuf>, dbout: PathBuf) -> Result<()
             // Get size
             let (w, h) = parse_size(line)?;
             dims = match &map {
-                Some(m) => Some(gds::augment_dims(m, &name, w, h, gdsunits)?),
+                Some(m) => Some(gds::augment_dims(m, &name, w, h, gdsunits, verbose)?),
                 None => Some(Dims::from(w, h, 0.0, 0.0)),
             }
         }
@@ -225,8 +224,12 @@ fn read_lef(lefin: PathBuf, gdsin: Option<PathBuf>, dbout: PathBuf) -> Result<()
 
     // Push last cell
     if let Some(c) = dims {
-        write_cell(&name, c, &mut wtr)?;
+        add_cell(&name, c, &mut db)?;
+        println!();
     }
+
+    // Write database to file
+    db.save(&dbout, verbose)?;
 
     Ok(())
 }
