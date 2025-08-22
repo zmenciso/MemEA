@@ -4,7 +4,6 @@
 //! results, including CSV, JSON, YAML, and direct console output. It handles
 //! file creation, overwrite confirmation, and format-specific serialization.
 
-use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::{metadata, File, OpenOptions};
 use std::io::{self, Write};
@@ -101,6 +100,35 @@ pub fn export(
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+struct Row<'a> {
+    #[serde(rename = "Configuration")]
+    configuration: &'a str,
+    #[serde(rename = "Name")]
+    name: &'a str,
+    #[serde(rename = "Type")]
+    celltype: String,
+    #[serde(rename = "Count")]
+    count: usize,
+    #[serde(rename = "Location")]
+    location: &'a str,
+    #[serde(rename = "Area (μm2)")]
+    area: Float,
+}
+
+impl<'a> Row<'a> {
+    fn from_report(config: &'a str, rep: &'a Report) -> Self {
+        Row {
+            configuration: config,
+            name: &rep.name,
+            celltype: rep.celltype.to_string(),
+            count: rep.count,
+            location: &rep.loc,
+            area: rep.area,
+        }
+    }
+}
+
 /// Exports reports to CSV format with configuration names included.
 ///
 /// Each row in the CSV contains a configuration name along with flattened
@@ -119,23 +147,13 @@ fn export_csv(reports: &HashMap<String, Reports>, buf: Option<File>) -> Result<(
         None => Box::new(io::stdout()),
     };
 
-    let mut wtr = csv::Writer::from_writer(writer);
+    let mut wtr = csv::WriterBuilder::new()
+        .has_headers(true)
+        .from_writer(writer);
 
     for (config, reps) in reports {
         for rep in reps {
-            // Wrap report with config name so it's included in CSV
-
-            #[derive(Serialize)]
-            struct Row<'a> {
-                configuration: &'a str,
-                #[serde(flatten)]
-                report: &'a Report,
-            }
-            let row = Row {
-                configuration: config,
-                report: rep,
-            };
-            wtr.serialize(row)?;
+            wtr.serialize(Row::from_report(config, rep))?;
         }
     }
 
