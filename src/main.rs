@@ -1,11 +1,9 @@
 use clap::Parser;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::time::Instant;
+use std::{collections::HashMap, path::PathBuf, time::Instant};
 
 use memea::*;
 
-const DEFAULT_DB: &str = "./data/db.txt";
+const DEFAULT_DB: &str = "./data/db.yaml";
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, name = "MemEA", about = "Layout-informed memory macro area estimator")]
@@ -16,7 +14,11 @@ pub struct Args {
     #[arg(short, long, default_value = DEFAULT_DB, help = "Path to the database file")]
     db: PathBuf,
 
-    #[arg(short, long, help = "Export results to file in CSV format")]
+    #[arg(
+        short,
+        long,
+        help = "Export results to file in CSV/JSON/YAML format (chosen from extension)"
+    )]
     export: Option<PathBuf>,
 
     #[arg(
@@ -55,8 +57,8 @@ fn main() -> Result<(), MemeaError> {
 
     if args.build_db {
         println!("{LOGO}");
-        println!("{}", bar(Some("Interactive Database Builder"), '#'));
-        lef::lefin()?;
+        println!("{}\n", bar(Some("Interactive Database Builder"), '#'));
+        lef::lefin(verbose)?;
         return Ok(());
     } else if args.input.is_empty() {
         errorln!("No configuration files provided, aborting...");
@@ -95,7 +97,7 @@ fn main() -> Result<(), MemeaError> {
     );
     let start = Instant::now();
 
-    let mut reports: HashMap<String, Reports> = HashMap::new();
+    let mut reports: HashMap<String, tabulate::Reports> = HashMap::new();
     for (name, c) in &configs {
         match tabulate::tabulate(name, c, &db, scale) {
             Ok(r) => {
