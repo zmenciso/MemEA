@@ -5,15 +5,14 @@ pub mod gds;
 pub mod lef;
 pub mod tabulate;
 
-use dialoguer::Completion;
-use std::fs;
-use std::io;
-use std::path::Path;
-
 use crate::config::ConfigError;
-use crate::db::{CellType, DBError};
 use crate::lef::LefError;
+
+use dialoguer::Completion;
 use std::fmt::Write;
+use std::fs;
+use std::io::{self, Write as IoWrite};
+use std::path::Path;
 use terminal_size::{terminal_size, Width};
 use thiserror::Error;
 
@@ -28,18 +27,7 @@ pub const LOGO: &str = r#"
   / /|_/ / _ \/ __ `__ \/ __/ / /| |
  / /  / /  __/ / / / / / /___/ ___ |
 /_/  /_/\___/_/ /_/ /_/_____/_/  |_|
-
 "#;
-
-// Verbose printing
-#[macro_export]
-macro_rules! vprintln {
-    ($verbose:expr, $($arg:tt)*) => {
-        if $verbose {
-            println!($($arg)*);
-        }
-    };
-}
 
 #[macro_export]
 macro_rules! eliteral {
@@ -88,18 +76,14 @@ macro_rules! errorln {
     ($($tt:tt)*) => { $crate::__log_internal!(eprintln, "31", "ERROR", $($tt)*) }
 }
 
-#[derive(Debug, Error)]
-pub enum ValueError {
-    #[error("Expected a Value::Usize")]
-    NotUsize,
-    #[error("Expected a Value::Float")]
-    NotFloat,
-    #[error("Expected a Value::FloatVec")]
-    NotFloatVec,
-    #[error("Expected a Value::String")]
-    NotString,
-    #[error("Expected a Value::Range")]
-    NotRange,
+// Verbose printing
+#[macro_export]
+macro_rules! vprintln {
+    ($verbose:expr, $($arg:tt)*) => {
+        if $verbose {
+            $crate::infoln!($($arg)*);
+        }
+    };
 }
 
 #[derive(Debug, Error)]
@@ -116,16 +100,20 @@ pub enum MemeaError {
     ParseFloat(#[from] std::num::ParseFloatError),
     #[error("Config error: {0}")]
     Config(#[from] ConfigError),
-    #[error("Value error: {0}")]
-    Value(#[from] ValueError),
-    #[error("Database error: {0}")]
-    Database(#[from] DBError),
     #[error("LEF error: {0}")]
     Lef(#[from] LefError),
     #[error("Dialogue error: {0}")]
     Dialogue(#[from] dialoguer::Error),
-    #[error("Deserialize error: {0}")]
-    Serde(#[from] serde_yaml::Error),
+    #[error("YAML error: {0}")]
+    SerdeYaml(#[from] serde_yaml::Error),
+    #[error("JSON error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+    #[error("CSV export error: {0}")]
+    CSV(#[from] csv::Error),
+    #[error("Parse error: {0}")]
+    ParseError(String),
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] crate::db::DBError),
 }
 
 pub enum QueryDefault {
@@ -166,7 +154,10 @@ pub fn query(prompt: &str, warn: bool, default: QueryDefault) -> Result<bool, Me
 
     match warn {
         true => warn!("{} {}", prompt, query),
-        false => print!("{prompt} {query}"),
+        false => {
+            print!("{prompt} {query}");
+            std::io::stdout().flush()?;
+        }
     }
 
     let mut input = String::new();
@@ -219,7 +210,7 @@ pub fn bar(header: Option<&str>, ch: char) -> String {
         .ok();
     }
 
-    writeln!(output, "{}", ch.to_string().repeat(width)).ok();
+    write!(output, "{}", ch.to_string().repeat(width)).ok();
 
     output
 }
@@ -262,17 +253,6 @@ pub fn scale(from: usize, to: usize) -> Float {
     }
 }
 
-#[derive(Debug)]
-pub struct Report {
-    pub name: String,
-    pub count: usize,
-    pub kind: CellType,
-    pub loc: String,
-    pub area: Float,
-}
-
-pub type Reports = Vec<Report>;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Range {
     pub min: Float,
@@ -289,7 +269,7 @@ pub fn parse_tuple(line: &str) -> Result<(Float, Float), MemeaError> {
         .trim()
         .trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != ',' && c != ';' && c != '-')
         .split_once(|c: char| c == ',' || c == ';' || c.is_whitespace())
-        .ok_or(DBError::TupleParseError(line.to_string()))?;
+        .ok_or(MemeaError::ParseError(line.to_string()))?;
 
     let a: Float = a.trim().parse::<Float>()?;
     let b: Float = b.trim().parse::<Float>()?;
