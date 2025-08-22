@@ -1,0 +1,10 @@
+name: 64-64
+n: 128
+m: 64
+bl: [1, 2, 0]
+wl: [4, 2.5, 0, 1]
+well: [0, 4]
+cell: 1FeFET_100
+enob: 1
+fs: 1e9
+adcs: 64
