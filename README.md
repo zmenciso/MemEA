@@ -4,8 +4,7 @@ MemEA is a simple tool for estimating the area breakdown of memory arrays.
 It supports multiple array types (e.g. CAM, SRAM, compute-in-memory) and
 emerging devices (e.g. FeFET).
 
-See the full documentation here!
-[![Documentation](https://img.shields.io/badge/docs-gh--pages-blue)](https://zmenciso.github.io/MemEA/memea/)
+[Read the full documentation here!](https://zmenciso.github.io/MemEA/memea/)
 
 ## Installation
 
