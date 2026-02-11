@@ -153,6 +153,7 @@ fn export_csv(reports: &HashMap<String, Reports>, buf: Option<File>) -> Result<(
 
     for (config, reps) in reports {
         for rep in reps {
+            // TODO: Cannot serialize maps
             wtr.serialize(Row::from_report(config, rep))?;
         }
     }

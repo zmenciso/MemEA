@@ -264,7 +264,7 @@ pub fn tabulate(
         results.push(report);
     } else {
         warnln!(
-            "Missing ADC config info for {} (expecting 'enob', 'fs', and 'adcs'); ADCs will not be generated",
+            "Missing ADC config info for {} (expecting 'bits', 'fs', and 'adcs'); ADCs will not be generated",
             id
         );
     }

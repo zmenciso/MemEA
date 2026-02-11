@@ -47,8 +47,9 @@ use crate::config::ConfigError;
 use crate::lef::LefError;
 
 use dialoguer::Completion;
+use std::ffi::OsStr;
 use std::fmt::Write;
-use std::fs;
+use std::fs::{self, metadata};
 use std::io::{self, Write as IoWrite};
 use std::path::Path;
 use terminal_size::{terminal_size, Width};
@@ -350,7 +351,6 @@ pub fn bar(header: Option<&str>, ch: char) -> String {
 ///
 /// # Returns
 /// Scaling factor for the technology node, or `None` if not recognized
-
 fn get_scale(n: &usize) -> Option<Float> {
     match n {
         65 => Some(0.52),
@@ -441,6 +441,63 @@ pub struct Range {
 pub fn parse_range(line: &str) -> Result<Range, MemeaError> {
     let (min, max) = parse_tuple(line)?;
     Ok(Range { min, max })
+}
+
+/// Checks whether a given path points to an existing file **and** that the file’s
+/// extension matches one of the supplied allowed extensions.
+///
+/// The function prints a helpful error message when the check fails, then
+/// returns `false`.  On success it simply returns `true`.
+///
+/// # Arguments
+///
+/// * `path`    – A reference to a `Path` that should point to the file you want to validate.
+/// * `allowed` – A slice of accepted extensions **without** the leading dot (e.g. `&["txt", "md", "csv"]`).  Comparison is case‑insensitive, so `"JPG"` matches `"jpg"` on all platforms.
+///
+/// # Returns
+///
+/// * `true`  – The file exists **and** its extension is allowed.
+/// * `false` – File cannot be accessed or has wrong extension
+///
+/// # Example
+///
+/// ```rust
+/// use std::path::Path;
+///
+/// // Accept either .txt or .md files
+/// let ok = check_filetype(Path::new("notes.txt"), &["txt", "md"]);
+/// assert!(ok);
+///
+/// // Wrong extension: prints an error and returns false
+/// let not_ok = check_filetype(Path::new("image.png"), &["txt", "md"]);
+/// assert!(!not_ok);
+/// ```
+pub fn check_filetype(path: &Path, allowed: &[&str]) -> bool {
+    if metadata(path).is_err() {
+        errorln!("{:?} does not exist or cannot be accessed", path);
+        return false;
+    }
+
+    match path.extension().and_then(OsStr::to_str) {
+        Some(actual) => {
+            // Normalise to lower‑case once for the comparison
+            let actual_lc = actual.to_ascii_lowercase();
+            if allowed.iter().any(|&e| e.eq_ignore_ascii_case(&actual_lc)) {
+                true
+            } else {
+                errorln!(
+                    "{:?} must be one of the following file types: {:?}",
+                    path,
+                    allowed
+                );
+                false
+            }
+        }
+        None => {
+            errorln!("{:?} must have a file extension", path);
+            false
+        }
+    }
 }
 
 /// Parses a tuple of two floating-point values from a string.

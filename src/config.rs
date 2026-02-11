@@ -91,6 +91,7 @@ pub struct Config {
 /// let config = read(&config_path).expect("Failed to read config");
 /// ```
 fn read(filename: &std::path::PathBuf) -> Result<Config, MemeaError> {
+    // TODO: Check filetype
     let file = fs::File::open(filename)?;
     let rdr = BufReader::new(file);
     let config: Config = serde_yaml::from_reader(rdr)?;

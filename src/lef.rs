@@ -13,8 +13,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+use crate::{check_filetype, errorln, query, vprintln, warnln, Float, MemeaError};
 use crate::{db::*, gds, FileCompleter, QueryDefault};
-use crate::{errorln, query, vprintln, warnln, Float, MemeaError};
 
 /// Errors that can occur during LEF file parsing.
 #[derive(Debug, Error)]
@@ -126,11 +126,8 @@ pub fn lefin(verbose: bool) -> Result<(), MemeaError> {
         if gdsfile.is_empty() {
             warnln!("No GDS file provided; enclosures will not be computed.");
             break;
-        } else if metadata(path).is_ok() && path.extension().and_then(|e| e.to_str()) == Some("gds")
-        {
+        } else if check_filetype(path, &["gds"]) {
             break;
-        } else {
-            errorln!("{} is not a GDS file", gdsfile);
         }
     }
 
@@ -142,10 +139,8 @@ pub fn lefin(verbose: bool) -> Result<(), MemeaError> {
 
         let path = Path::new(&leffile);
 
-        if metadata(path).is_ok() && path.extension().and_then(|e| e.to_str()) == Some("lef") {
+        if check_filetype(path, &["lef"]) {
             break;
-        } else {
-            errorln!("{} is not a LEF file", leffile);
         }
     }
 
