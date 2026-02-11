@@ -1,10 +1,9 @@
 # MemEA
 
 MemEA is a simple tool for estimating the area breakdown of memory arrays.
-It supports multiple array types (e.g. CAM, SRAM, compute-in-memory) and
-emerging devices (e.g. FeFET).
+It supports multiple array types (e.g. CAM, SRAM, compute-in-memory) and emerging devices (e.g. FeFET).
 
-[Read the full documentation here!](https://zmenciso.github.io/MemEA/memea/)
+[Read the library documentation here!](https://zmenciso.github.io/MemEA/memea/)
 
 ## Installation
 
@@ -18,29 +17,22 @@ The output executable will be `target/release/memea`.
 
 ## Usage
 
-MemEA requires two inputs: **1)** a configuration file that describes the memory
-array and **2)** a database of cells and peripheral circuits. Both the
-configuration files and the cell database can be written in YAML or JSON. MemEA
-also accepts **multiple configuration files**, which will be compared against
-each other after running.
+MemEA requires two inputs: **1)** a configuration file that describes the memory array and **2)** a database of cells and peripheral circuits.
+Both the configuration files and the cell database can be written in YAML or JSON.
+MemEA also accepts **multiple configuration files**, which will be compared against each other after running.
 
 Command line options:
 
-- `-e` or `--export` `[FILENAME]`: Output results to file in CSV/JSON/YAML
-  format (chosen from extension)
+- `-e` or `--export` `[FILENAME]`: Output results to file in CSV/JSON/YAML format (chosen from extension)
 - `-a` or `--area-only`: Only output total area (automatically toggles `-q`)
 - `-q` or `--quiet`: Suppress nonessential messages
 - `-d` or `--db`: Specify database (default: `./data/db.yaml`)
-- `--autoscale` `[FROM]` `[TO]`: Use built-in transistor scaling data to scale
-  area from source technology node (e.g. `65`) to target technology node (e.g.
-  `22`)
-- `--scale` `[VALUE]`: Manually specify a scaling value to scale area (e.g.
-  `0.124`)
+- `--autoscale` `[FROM]` `[TO]`: Use built-in transistor scaling data to scale area from source technology node (e.g. `65`) to target technology node (e.g. `22`)
+- `--scale` `[VALUE]`: Manually specify a scaling value to scale area (e.g. `0.124`)
 
 ### Memory Configuration
 
-Each memory configuration is written in YAML, and a full list of options is
-provided below:
+Each memory configuration is written in YAML, and a full list of options is provided below:
 
 | Option | Type           | Description                                                                                            | Example           |
 | ------ | -------------- | ------------------------------------------------------------------------------------------------------ | ----------------- |
@@ -54,10 +46,9 @@ provided below:
 | `fs`   | `float`        | ADC sampling rate                                                                                      | `1e9`             |
 | `adcs` | `int`          | Number of ADCs per array                                                                               | `64`              |
 
-"Bitline" and "wordline" represent abstract vertical and horizontal lines,
-respectively. If more lines are needed (e.g. bitline **and** senseline, a cell
-representing an entire word with many bitlines), then repeat voltages in the
-appropriate line. For example:
+"Bitline" and "wordline" represent abstract vertical and horizontal lines, respectively.
+If more lines are needed (e.g. bitline **and** senseline, a cell representing an entire word with many bitlines), then repeat voltages in the appropriate line.
+For example:
 
 ```yaml
 bl: [4, 4, 2.5, 0, 0]
@@ -67,14 +58,12 @@ An example configuration is also available: `examples/config.yaml`.
 
 ### Database
 
-`memea` has a **database generator** that builds the database from LEF and GDS
-files. For more information, scroll to [**Database
-Generator**](#database-generator). Otherwise, read on for writing the database
-file manually:
+`memea` has a **database generator** that builds the database from LEF and GDS files.
+For more information, scroll to [**Database Generator**](#database-generator).
+Otherwise, read on for writing the database file manually:
 
-The database has four types of circuits: `core`, `logic`, `switch`, and `adc`,
-which should be the four topmost keys in the file. Nested within each type key
-are the cells themselves. For example:
+The database has four types of circuits: `core`, `logic`, `switch`, and `adc`, which should be the four topmost keys in the file.
+Nested within each type key are the cells themselves. For example:
 
 ```yaml
 switch:
@@ -97,8 +86,7 @@ All types of circuits require the following geometric properties:
 
 > Check back for a diagram explaining these properties
 
-> **note**: `memea` assumes that cells cannot be rotated, as this is the case in
-> most advanced manufacturing nodes.
+> **note**: `memea` assumes that cells cannot be rotated, as this is the case in most advanced manufacturing nodes.
 
 Then, each of the four types has additional properties:
 
@@ -111,9 +99,8 @@ Then, each of the four types has additional properties:
 
 #### `logic`
 
-For logic, include any required signal buffers and inverters. For example, a
-decoder driving transmission gates will require complimentary outputs (extra
-inverters).
+For logic, include any required signal buffers and inverters.
+For example, a decoder driving transmission gates will require complimentary outputs (extra inverters).
 
 | Option | Type    | Description                                                                    | Example |
 | ------ | ------- | ------------------------------------------------------------------------------ | ------- |
@@ -123,9 +110,8 @@ inverters).
 
 #### `switch`
 
-For all switches, include any required well biasing contacts. For high voltage
-switches, include the level shifters required to drive them from core voltage
-logic.
+For all switches, include any required well biasing contacts.
+For high voltage switches, include the level shifters required to drive them from core voltage logic.
 
 | Option    | Type         | Description                                                 | Example      |
 | --------- | ------------ | ----------------------------------------------------------- | ------------ |
@@ -134,8 +120,7 @@ logic.
 
 #### `adc`
 
-For ADCs, include any switches that might be needed to isolate the circuit from
-high voltage.
+For ADCs, include any switches that might be needed to isolate the circuit from high voltage.
 
 | Option | Type    | Description                      | Example |
 | ------ | ------- | -------------------------------- | ------- |
@@ -144,17 +129,13 @@ high voltage.
 
 ### Database Generator
 
-Invoke the database generator with the `-b` or `--build-db` argument, then
-follow the interactive prompts. You will need to export your cell library as a
-LEF file (File > Export > LEF in Virtuoso) _and_ as a GDS file (File > Export >
-Stream in Virtuoso). The database generator can be run without a GDS file by
-leaving the prompt blank, but the resulting cell database will not include
-enclosures.
+Invoke the database generator with the `-b` or `--build-db` argument, then follow the interactive prompts.
+You will need to export your cell library as a LEF file (File > Export > LEF in Virtuoso) _and_ as a GDS file (File > Export > Stream in Virtuoso).
+The database generator can be run without a GDS file by leaving the prompt blank, but the resulting cell database will not include enclosures.
 
 ## Helper Scripts
 
-Check back for scripts that automate generating common configuration runs, such
-as:
+Check back for scripts that automate generating common configuration runs, such as:
 
 - Multiple array dimensions for the same memory configuration
 - Write voltage sweeps
@@ -163,15 +144,10 @@ as:
 
 ### New Features
 
-- Combine like elements in area breakdown (i.e. only report unique
-  occurrences)
+- Combine like elements in area breakdown (i.e. only report unique occurrences)
 - Produce example/estimated floorplan for each configuration
-- Support for shared peripherals across multiple memory arrays (e.g. BL
-  drivers alternate between driving two different arrays)
-- Stacking multiple switches per row/column to achieve the required drive
-  strength
+- Support for shared peripherals across multiple memory arrays (e.g. BL drivers alternate between driving two different arrays)
+- Stacking multiple switches per row/column to achieve the required drive strength
 - GUI mode
-- Better configuration system (i.e. specify variable sweeps within the
-  configuration file)
-- Automatic enob calculation option based on the number of rows (assuming
-  1-bit per cell): `enob auto`
+- Better configuration system (i.e. specify variable sweeps within the configuration file)
+- Automatic enob calculation option based on the number of rows (assuming 1-bit per cell): `enob auto`
