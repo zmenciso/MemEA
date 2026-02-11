@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["LOGO","VER"],"enum":["MemeaError","QueryDefault"],"fn":["bar","get_scale","parse_range","parse_tuple","query","scale"],"macro":["__log_internal","eliteral","error","errorln","info","infoln","vprintln","warn","warnln"],"mod":["config","db","export","gds","lef","tabulate"],"struct":["FileCompleter","Range"],"type":["Float","Mosaic"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["LOGIC_SCALE","SINGLE","WELL_SCALE"],"fn":["locate_adc","locate_core","locate_logic","locate_switch","tabulate"],"struct":["Report"],"type":["Reports"]};

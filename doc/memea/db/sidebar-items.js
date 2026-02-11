@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["CellType","DBError"],"fn":["build_db","prompt","valid_ext","write_db"],"struct":["ADC","Core","Database","Dims","Logic","Switch"]};

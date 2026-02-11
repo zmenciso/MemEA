@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["area","export","export_csv","export_direct","export_json","export_yaml","fmt_direct"]};

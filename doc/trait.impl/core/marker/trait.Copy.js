@@ -1,9 +1,0 @@
-(function() {
-    var implementors = Object.fromEntries([["memea",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.1/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"memea/db/struct.ADC.html\" title=\"struct memea::db::ADC\">ADC</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.1/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"memea/db/struct.Core.html\" title=\"struct memea::db::Core\">Core</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.1/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"memea/db/struct.Dims.html\" title=\"struct memea::db::Dims\">Dims</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.1/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"memea/db/struct.Logic.html\" title=\"struct memea::db::Logic\">Logic</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.1/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"memea/db/struct.Switch.html\" title=\"struct memea::db::Switch\">Switch</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.1/core/marker/trait.Copy.html\" title=\"trait core::marker::Copy\">Copy</a> for <a class=\"struct\" href=\"memea/struct.Range.html\" title=\"struct memea::Range\">Range</a>"]]]]);
-    if (window.register_implementors) {
-        window.register_implementors(implementors);
-    } else {
-        window.pending_implementors = implementors;
-    }
-})()
-//{"start":57,"fragment_lengths":[1471]}
