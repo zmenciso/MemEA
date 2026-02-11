@@ -81,8 +81,8 @@ impl Dims {
     /// # Returns
     /// Total area in square micrometers including enclosures
     pub fn area(&self, (n, m): Mosaic) -> Float {
-        ((n as Float * self.size[0]) + (self.enc[0] * 2.0))
-            * ((m as Float * self.size[1]) + (self.size[1] * 2.0))
+        ((m as Float * self.size[0]) + (self.enc[0] * 2.0))
+            * ((n as Float * self.size[1]) + (self.size[1] * 2.0))
     }
 
     /// Prints the dimensions in a human-readable format.
