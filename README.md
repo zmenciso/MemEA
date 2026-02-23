@@ -58,7 +58,7 @@ An example configuration is also available: `examples/config.yaml`.
 
 ### Database
 
-`memea` has a **database generator** that builds the database from LEF and GDS files.
+MemEA has a **database generator** that builds the database from LEF and GDS files.
 For more information, scroll to [**Database Generator**](#database-generator).
 Otherwise, read on for writing the database file manually:
 
@@ -86,7 +86,7 @@ All types of circuits require the following geometric properties:
 
 > Check back for a diagram explaining these properties
 
-> **note**: `memea` assumes that cells cannot be rotated, as this is the case in most advanced manufacturing nodes.
+> **note**: MemEA assumes that cells cannot be rotated, as this is the case in most advanced manufacturing nodes.
 
 Then, each of the four types has additional properties:
 
@@ -139,6 +139,7 @@ Check back for scripts that automate generating common configuration runs, such 
 
 - Multiple array dimensions for the same memory configuration
 - Write voltage sweeps
+- Parsing MemEA outputs
 
 ## Planned Updates
 
