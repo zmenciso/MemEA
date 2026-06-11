@@ -106,10 +106,12 @@ impl Dims {
 /// including drive strengths for wordlines and bitlines.
 #[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct Core {
-    /// Requred wordline drive strength
-    pub dx_wl: Float,
-    /// Required bitline drive strength
-    pub dx_bl: Float,
+    /// Wordline capacitance per-cell in fF
+    pub cap_wl: Float,
+    /// Bitline capacitance per-cell in fF
+    pub cap_bl: Float,
+    /// Well capacitance per-cell in fF
+    pub cap_well: Option<Float>,
     /// Physical dimensions of the core cell
     pub dims: Dims,
 }
@@ -135,10 +137,12 @@ pub struct Logic {
 /// Represents switching elements with their drive capability and voltage range.
 #[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct Switch {
-    /// Drive strength of the switch
+    /// Drive strength needed for the switch
     pub dx: Float,
     /// Voltage range as [minimum, maximum] in volts
     pub voltage: [Float; 2],
+    /// Switch ON resistance in Ohms
+    pub res: Float,
     /// Physical dimensions of the switch
     pub dims: Dims,
 }
@@ -261,7 +265,7 @@ impl Database {
     /// * `dims` - Physical dimensions of the ADC
     pub fn add_adc(&mut self, name: &str, dims: Dims) {
         let enob: Float = prompt("Bits");
-        let fs: f32 = prompt("Sampling rate");
+        let fs: Float = prompt("Sampling rate (Hz)");
 
         let adc = ADC { enob, fs, dims };
         self.adc.insert(name.to_string(), adc);
@@ -273,10 +277,14 @@ impl Database {
     /// * `name` - Name identifier for the core cell
     /// * `dims` - Physical dimensions of the core cell
     pub fn add_core(&mut self, name: &str, dims: Dims) {
-        let dx_wl: f32 = prompt::<f32>("WL drive strength");
-        let dx_bl: f32 = prompt::<f32>("BL drive strength");
+        let cap_wl: Float = prompt("BL capacitance per-cell (fF)");
+        let cap_bl: Float = prompt("WL capacitance per-cell (fF)");
 
-        let core = Core { dx_wl, dx_bl, dims };
+        let core = Core {
+            cap_wl,
+            cap_bl,
+            dims,
+        };
         self.core.insert(name.to_string(), core);
     }
 
@@ -286,9 +294,9 @@ impl Database {
     /// * `name` - Name identifier for the logic block
     /// * `dims` - Physical dimensions of the logic block
     pub fn add_logic(&mut self, name: &str, dims: Dims) {
-        let dx: f32 = prompt::<f32>("Drive strength");
-        let bits: usize = prompt::<usize>("Decoding bits");
-        let fs: f32 = prompt::<f32>("Sampling rate");
+        let dx: Float = prompt("Drive strength");
+        let bits: usize = prompt("Decoding bits");
+        let fs: Float = prompt("Sampling rate (Hz)");
 
         let logic = Logic { dx, bits, fs, dims };
         self.logic.insert(name.to_string(), logic);
@@ -300,13 +308,15 @@ impl Database {
     /// * `name` - Name identifier for the switch
     /// * `dims` - Physical dimensions of the switch
     pub fn add_switch(&mut self, name: &str, dims: Dims) {
-        let dx: f32 = prompt::<f32>("Drive strength");
-        let vmin: f32 = prompt::<f32>("Minimum voltage");
-        let vmax: f32 = prompt::<f32>("Maximum voltage");
+        let dx: Float = prompt::<Float>("Drive strength");
+        let vmin: Float = prompt::<Float>("Minimum voltage (Volts)");
+        let vmax: Float = prompt::<Float>("Maximum voltage (Volts)");
+        let res: Float = prompt::<Float>("ON resistance (Ohms)");
 
         let switch = Switch {
             dx,
             voltage: [vmin, vmax],
+            res,
             dims,
         };
         self.switch.insert(name.to_string(), switch);

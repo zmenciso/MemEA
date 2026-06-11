@@ -4,9 +4,8 @@ use crate::config::Config;
 use crate::db::*;
 use crate::{warnln, Float, MemeaError, Mosaic};
 
-// Drive strength multipliers
-const WELL_SCALE: Float = 0.25;
-const LOGIC_SCALE: Float = 0.5;
+// Logic with drive strength DX can drive switches with total drive DX * DX_SCALE
+const DX_SCALE: Float = 3.0;
 
 const SINGLE: Mosaic = (1, 1);
 
@@ -31,7 +30,7 @@ fn locate_logic(
     let mut sel: Option<&Logic> = None;
 
     for (name, logic) in &db.logic {
-        let condition = || -> bool { logic.dx >= dx && logic.bits >= bits };
+        let condition = || -> bool { logic.dx * DX_SCALE >= dx && logic.bits >= bits };
 
         if sel.is_none() && condition() {
             (target, sel) = (name.clone(), Some(logic));
@@ -84,7 +83,7 @@ fn locate_adc(
 fn locate_switch(
     db: &Database,
     voltage: Float,
-    dx: Float,
+    res: Float,
     mos: Mosaic,
 ) -> Result<(String, Switch), DBError> {
     let mut target = String::new();
@@ -92,7 +91,7 @@ fn locate_switch(
 
     for (name, switch) in &db.switch {
         let condition = || -> bool {
-            switch.dx >= dx && voltage >= switch.voltage[0] && voltage <= switch.voltage[1]
+            switch.res <= res && voltage >= switch.voltage[0] && voltage <= switch.voltage[1]
         };
 
         if sel.is_none() && condition() {
@@ -108,7 +107,7 @@ fn locate_switch(
     match sel {
         Some(x) => Ok((target, *x)),
         None => Err(DBError::NoSuitableCells(format!(
-            "Switch for voltage {voltage} and dx {dx}"
+            "Switch for voltage {voltage} and ON resistance {res}"
         ))),
     }
 }
@@ -149,10 +148,11 @@ pub fn tabulate(
     // WL peripheral area
     let mos = (config.n, 1);
     if let Some(v) = &config.wl {
-        let dx = config.n as Float * core.dx_wl;
+        let res: Float = 1.0 / (config.n as Float * core.cap_wl * config.fs);
+        let mut dx: Float = 0.0;
 
         for voltage in v {
-            let (target, switch) = locate_switch(db, *voltage, dx, mos)?;
+            let (target, switch) = locate_switch(db, *voltage, res, mos)?;
             let report = Report {
                 name: target,
                 count: config.n,
@@ -161,10 +161,11 @@ pub fn tabulate(
                 area: switch.dims.area(mos) * scale,
             };
             results.push(report);
+            dx += switch.dx;
         }
 
         let bits = (v.len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(db, dx * LOGIC_SCALE, bits, mos)?;
+        let (target, logic) = locate_logic(db, dx, bits, mos)?;
         let report = Report {
             name: target,
             count: config.n,
@@ -183,10 +184,11 @@ pub fn tabulate(
     // BL peripheral area
     let mos = (1, config.m);
     if let Some(v) = &config.bl {
-        let dx = config.m as Float * core.dx_bl;
+        let res: Float = 1.0 / (config.m as Float * core.cap_bl * config.fs);
+        let mut dx: Float = 0.0;
 
         for voltage in v {
-            let (target, switch) = locate_switch(db, *voltage, dx, mos)?;
+            let (target, switch) = locate_switch(db, *voltage, res, mos)?;
             let report = Report {
                 name: target,
                 count: config.m,
@@ -195,10 +197,11 @@ pub fn tabulate(
                 area: switch.dims.area(mos) * scale,
             };
             results.push(report);
+            dx += switch.dx;
         }
 
         let bits = (v.len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(db, dx * LOGIC_SCALE, bits, mos)?;
+        let (target, logic) = locate_logic(db, dx, bits, mos)?;
         let report = Report {
             name: target,
             count: config.m,
@@ -216,11 +219,12 @@ pub fn tabulate(
 
     // Well peripheral area
     let mos = (1, config.m);
-    if let Some(v) = &config.well {
-        let dx = config.n as Float * ((core.dx_bl + core.dx_wl) / 2.0) * WELL_SCALE;
+    if let (Some(v), Some(cap)) = (&config.well, core.cap_well) {
+        let res: Float = 1.0 / (cap * config.n as Float * config.m as Float * config.fs);
+        let mut dx: Float = 0.0;
 
         for voltage in v {
-            let (target, switch) = locate_switch(db, *voltage, dx, mos)?;
+            let (target, switch) = locate_switch(db, *voltage, res, mos)?;
             let report = Report {
                 name: target,
                 count: config.m,
@@ -229,10 +233,11 @@ pub fn tabulate(
                 area: switch.dims.area(mos) * scale,
             };
             results.push(report);
+            dx += switch.dx;
         }
 
         let bits = (v.len() as Float).log2().ceil() as usize;
-        let (target, logic) = locate_logic(db, dx * LOGIC_SCALE, bits, SINGLE)?;
+        let (target, logic) = locate_logic(db, dx, bits, SINGLE)?;
         let report = Report {
             name: target,
             count: 1,
@@ -243,16 +248,16 @@ pub fn tabulate(
         results.push(report);
     } else {
         warnln!(
-            "No 'well' key supplied, skipping well drivers for config {}",
+            "No 'well' key or well capacitance supplied, skipping well drivers for config {}",
             id
         )
     }
 
     // ADC area
-    if let (Some(bits), Some(fs), Some(adcs)) = (config.bits, config.fs, config.adcs) {
+    if let (Some(bits), Some(adcs)) = (config.bits, config.adcs) {
         let mos = (1, adcs);
 
-        let (target, adc) = locate_adc(db, fs, bits, mos)?;
+        let (target, adc) = locate_adc(db, config.fs, bits, mos)?;
         let report = Report {
             name: target,
             count: adcs,
@@ -264,7 +269,7 @@ pub fn tabulate(
         results.push(report);
     } else {
         warnln!(
-            "Missing ADC config info for {} (expecting 'bits', 'fs', and 'adcs'); ADCs will not be generated",
+            "Missing ADC config info for {} (expecting 'bits' and 'adcs'); ADCs will not be generated",
             id
         );
     }
