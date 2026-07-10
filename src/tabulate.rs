@@ -5,7 +5,7 @@ use crate::db::*;
 use crate::{warnln, Float, MemeaError, Mosaic};
 
 // Logic with drive strength DX can drive switches with total drive DX * DX_SCALE
-const DX_SCALE: Float = 3.0;
+const DX_SCALE: Float = 4.0;
 
 const SINGLE: Mosaic = (1, 1);
 
