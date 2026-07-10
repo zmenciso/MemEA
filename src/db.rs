@@ -279,10 +279,12 @@ impl Database {
     pub fn add_core(&mut self, name: &str, dims: Dims) {
         let cap_wl: Float = prompt("BL capacitance per-cell (fF)");
         let cap_bl: Float = prompt("WL capacitance per-cell (fF)");
+        let cap_well: Float = prompt("Well capacitance per-cell (fF)");
 
         let core = Core {
             cap_wl,
             cap_bl,
+            cap_well: Some(cap_well),
             dims,
         };
         self.core.insert(name.to_string(), core);
