@@ -118,6 +118,7 @@ pub fn lefin(verbose: bool) -> Result<(), MemeaError> {
     loop {
         gdsfile = Input::new()
             .with_prompt("GDS file")
+            .allow_empty(true)
             .completion_with(&FileCompleter)
             .interact_text()?;
 
