@@ -3,10 +3,18 @@ use serde::Serialize;
 use crate::config::Config;
 use crate::db::*;
 use crate::{warnln, Float, MemeaError, Mosaic};
+use std::f64::consts::PI;
 
 // Logic with drive strength DX can drive switches with total drive DX * DX_SCALE
-const DX_SCALE: Float = 4.0;
+const DX_SCALE: Float = 5.0;
+// 1 time constant (τ = RC): 63.2% of final value
+// 2τ: 86.5%
+// 3τ: 95.0%
+// 4τ: 98.2%
+// 5τ: 99.3%
+const TAUS: Float = 5.0;
 
+const TWOPI: Float = PI as Float * 2.0;
 const SINGLE: Mosaic = (1, 1);
 
 #[derive(Debug, Serialize)]
@@ -148,7 +156,8 @@ pub fn tabulate(
     // WL peripheral area
     let mos = (config.n, 1);
     if let Some(v) = &config.wl {
-        let res: Float = 1.0 / (config.n as Float * core.cap_wl * config.fs);
+        // Capacitance is in fF, need to convert
+        let res: Float = 1.0 / (TWOPI * config.n as Float * core.cap_wl * 1e-15 * config.fs * TAUS);
         let mut dx: Float = 0.0;
 
         for voltage in v {
@@ -184,7 +193,7 @@ pub fn tabulate(
     // BL peripheral area
     let mos = (1, config.m);
     if let Some(v) = &config.bl {
-        let res: Float = 1.0 / (config.m as Float * core.cap_bl * config.fs);
+        let res: Float = 1.0 / (TWOPI * config.m as Float * core.cap_bl * 1e-15 * config.fs * TAUS);
         let mut dx: Float = 0.0;
 
         for voltage in v {
@@ -220,7 +229,8 @@ pub fn tabulate(
     // Well peripheral area
     let mos = (1, config.m);
     if let (Some(v), Some(cap)) = (&config.well, core.cap_well) {
-        let res: Float = 1.0 / (cap * config.n as Float * config.m as Float * config.fs);
+        let res: Float =
+            1.0 / (TWOPI * cap * config.n as Float * config.m as Float * 1e-15 * config.fs * TAUS);
         let mut dx: Float = 0.0;
 
         for voltage in v {
