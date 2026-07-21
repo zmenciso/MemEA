@@ -43,7 +43,7 @@ Each memory configuration is written in YAML, and a full list of options is prov
 | `well` | `array[float]` | Required well voltages (to bias a row-wise, column-wise or full-array deep n-well).                    | `[0, 4]`          |
 | `cell` | `string`       | Which in the database to use as the memory cell.                                                       | `2FeFET_TCAM_100` |
 | `enob` | `int`          | Minimum ENOB for downstream ADCs (also supports sense-amplifiers and other single-bit data conversion) | `1`               |
-| `fs`   | `float`        | ADC sampling rate                                                                                      | `1e9`             |
+| `fs`   | `float`        | Array processing rate / ADC sampling rate                                                              | `1e9`             |
 | `adcs` | `int`          | Number of ADCs per array                                                                               | `64`              |
 
 "Bitline" and "wordline" represent abstract vertical and horizontal lines, respectively.
@@ -69,7 +69,7 @@ Nested within each type key are the cells themselves. For example:
 switch:
   TXGD16:
     voltage: [0, 1.3]
-    dx: 16
+    res: 1070
     dims:
       size: [1.156, 0.995]
       enc: [0.2, 0.2]
@@ -92,10 +92,11 @@ Then, each of the four types has additional properties:
 
 #### `core`
 
-| Option  | Type    | Description                                        | Example |
-| ------- | ------- | -------------------------------------------------- | ------- |
-| `dx_bl` | `float` | Relative bitline drive strength required per-cell  | `0.25`  |
-| `dx_wl` | `float` | Relative wordline drive strength required per-cell | `0.25`  |
+| Option     | Type    | Description                                 | Example |
+| ---------- | ------- | ------------------------------------------- | ------- |
+| `cap_bl`   | `float` | Bitline capacitance per-cell, in fF         | `1.25`  |
+| `cap_wl`   | `float` | Wordline capacitance per-cell, in fF        | `1.25`  |
+| `cap_well` | `float` | Well capacitance per-cell, in fF (optional) | `1.25`  |
 
 #### `logic`
 
@@ -105,8 +106,11 @@ For example, a decoder driving transmission gates will require complimentary out
 | Option | Type    | Description                                                                    | Example |
 | ------ | ------- | ------------------------------------------------------------------------------ | ------- |
 | `fs`   | `float` | Maximum operating speed of the logic                                           | `1e9`   |
-| `dx`   | `float` | Relative drive strength output of the logic                                    | `6`     |
+| `dx`   | `float` | Relative drive strength of the logic's output                                  | `6`     |
 | `bits` | `uint`  | Number of control bits (i.e. a 2-bit logic circuit can drive up to 4 switches) | `2`     |
+
+> **Note**: MemEA uses the internal parameter `DX_SCALE` (default: 3) to determine the total input drive strength a logic cell can drive.
+> For example, if `DX_SCALE` = 3 and the decoder has an output drive strength of 4, then it can drive switches with a combined drive strength of 12.
 
 #### `switch`
 
@@ -116,7 +120,8 @@ For high voltage switches, include the level shifters required to drive them fro
 | Option    | Type         | Description                                                 | Example      |
 | --------- | ------------ | ----------------------------------------------------------- | ------------ |
 | `voltage` | `floatTuple` | Maximum voltage the switch can drive before oxide breakdown | `[0.8, 1.3]` |
-| `dx`      | `float`      | Relative drive strength of the switch                       | `16`         |
+| `dx`      | `float`      | Relative drive strength needed for the switch               | `16`         |
+| `res`     | `float`      | Switch ON resistance, in Ohms                               | `1070`       |
 
 #### `adc`
 
@@ -124,7 +129,7 @@ For ADCs, include any switches that might be needed to isolate the circuit from 
 
 | Option | Type    | Description                      | Example |
 | ------ | ------- | -------------------------------- | ------- |
-| `bits` | `float` | ENOB of the ADC                  | `6.2`   |
+| `enob` | `float` | ENOB of the ADC                  | `6.2`   |
 | `fs`   | `float` | Maximum sampling rate of the ADC | `2e9`   |
 
 ### Database Generator

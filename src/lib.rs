@@ -200,27 +200,75 @@ pub enum QueryDefault {
 /// File completion handler for interactive prompts.
 ///
 /// Provides tab completion functionality for file paths in interactive
-/// command-line interfaces.
+/// command-line interfaces. Extends to the longest common prefix on
+/// multiple matches.
 pub struct FileCompleter;
 
-// TODO: Remove spaghetti
 impl Completion for FileCompleter {
     fn get(&self, input: &str) -> Option<String> {
-        let expanded = shellexpand::tilde(input).to_string();
+        let expanded = shellexpand::tilde(input).into_owned();
         let path = Path::new(&expanded);
-        if let Some(parent) = path.parent() {
-            if let Ok(entries) = fs::read_dir(parent) {
-                for entry in entries.flatten() {
-                    if let Some(name) = entry.path().file_name().and_then(|n| n.to_str()) {
-                        if name.starts_with(path.file_name().and_then(|n| n.to_str()).unwrap_or(""))
-                        {
-                            return Some(name.to_string());
-                        }
-                    }
+
+        // Separate the directory to search and the prefix to match against
+        let (dir, prefix) = if input.ends_with('/') {
+            (path, "")
+        } else {
+            let parent = path.parent().unwrap_or_else(|| Path::new(""));
+            let dir = if parent.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                parent
+            };
+            let prefix = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+            (dir, prefix)
+        };
+
+        let entries = fs::read_dir(dir).ok()?;
+        let mut matches = Vec::new();
+
+        // Collect ALL matches in the directory instead of stopping at the first one
+        for entry in entries.flatten() {
+            let file_name = entry.file_name();
+            if let Some(name_str) = file_name.to_str() {
+                if name_str.starts_with(prefix) {
+                    matches.push((name_str.to_string(), entry.path().is_dir()));
                 }
             }
         }
-        None
+
+        if matches.is_empty() {
+            return None;
+        }
+
+        // Find the Longest Common Prefix (LCP) among all matches
+        let mut lcp = matches[0].0.clone();
+        for (name, _) in &matches[1..] {
+            let mut matched_bytes = 0;
+            // Compare characters to avoid splitting UTF-8 boundaries incorrectly
+            for (c1, c2) in lcp.chars().zip(name.chars()) {
+                if c1 == c2 {
+                    matched_bytes += c1.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            lcp.truncate(matched_bytes);
+        }
+
+        // Reconstruct the path with the new common prefix
+        let mut result = path.parent().unwrap_or_else(|| Path::new("")).to_path_buf();
+
+        result.push(&lcp);
+
+        let mut completed = result.to_string_lossy().into_owned();
+
+        // If there is exactly one match and it's a directory, append the trailing slash
+        if matches.len() == 1 && matches[0].1 {
+            completed.push('/');
+        }
+
+        Some(completed)
     }
 }
 
@@ -258,7 +306,7 @@ pub fn query(prompt: &str, warn: bool, default: QueryDefault) -> Result<bool, Me
     };
 
     match warn {
-        true => warn!("{} {}", prompt, query),
+        true => warn!("{}{}", prompt, query),
         false => {
             print!("{prompt} {query}");
             std::io::stdout().flush()?;

@@ -62,12 +62,13 @@ pub struct Config {
     /// Voltages required for well biasing
     pub well: Option<Vec<Float>>,
 
+    /// Array processing rate / ADC sampling rate
+    pub fs: Float,
+
     /// Number of downstream analog-to-digital converters.
     pub adcs: Option<usize>,
     /// Number of bits required for ADCs.
     pub bits: Option<usize>,
-    /// Sampling rate of the ADCs in Hz.
-    pub fs: Option<Float>,
 
     /// Additional configuration options as key-value pairs.
     pub options: Option<HashMap<String, String>>,
