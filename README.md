@@ -3,7 +3,7 @@
 MemEA is a simple tool for estimating the area breakdown of memory arrays.
 It supports multiple array types (e.g. CAM, SRAM, compute-in-memory) and emerging devices (e.g. FeFET).
 
-[Read the full documentation here!](https://zmenciso.github.io/MemEA/memea/)
+[Read the library documentation here!](https://zmenciso.github.io/MemEA/memea/)
 
 ## Installation
 
@@ -18,7 +18,8 @@ The output executable will be `target/release/memea`.
 ## Usage
 
 MemEA requires two inputs: **1)** a configuration file that describes the memory array and **2)** a database of cells and peripheral circuits.
-Both the configuration files and the cell database can be written in YAML or JSON. MemEA also accepts **multiple configuration files**, which will be compared against each other after running.
+Both the configuration files and the cell database can be written in YAML or JSON.
+MemEA also accepts **multiple configuration files**, which will be compared against each other after running.
 
 Command line options:
 
@@ -57,7 +58,7 @@ An example configuration is also available: `examples/config.yaml`.
 
 ### Database
 
-`memea` has a **database generator** that builds the database from LEF and GDS files.
+MemEA has a **database generator** that builds the database from LEF and GDS files.
 For more information, scroll to [**Database Generator**](#database-generator).
 Otherwise, read on for writing the database file manually:
 
@@ -85,7 +86,7 @@ All types of circuits require the following geometric properties:
 
 > Check back for a diagram explaining these properties
 
-> **Note**: MemEA assumes that cells cannot be rotated, as this is the case in most advanced manufacturing nodes.
+> **note**: MemEA assumes that cells cannot be rotated, as this is the case in most advanced manufacturing nodes.
 
 Then, each of the four types has additional properties:
 
@@ -143,6 +144,7 @@ Check back for scripts that automate generating common configuration runs, such 
 
 - Multiple array dimensions for the same memory configuration
 - Write voltage sweeps
+- Parsing MemEA outputs
 
 ## Planned Updates
 
