@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["GdsError"],"fn":["augment_dims","compute_enc","hash_lib"]};
+window.SIDEBAR_ITEMS = {"enum":["GdsError"],"fn":["augment_dims","hash_lib"]};

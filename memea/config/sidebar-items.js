@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ConfigError"],"fn":["read","read_all"],"struct":["Config"],"type":["Configs"]};
+window.SIDEBAR_ITEMS = {"enum":["ConfigError"],"fn":["read_all"],"struct":["Config"]};
